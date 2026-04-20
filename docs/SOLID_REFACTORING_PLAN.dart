@@ -1,142 +1,141 @@
-/**
- * REFACTORIZACIÓN DEL CLIENTE FLUTTER - PRINCIPIOS SOLID
- * 
- * CAMBIOS PLANEADOS:
- * 
- * ======================== ANTES (Anti-pattern) ========================
- * 
- * AppData (monolito)
- * ├── WebSocket connection
- * ├── Game state management
- * ├── Player logic
- * ├── Room management
- * ├── Movement updates
- * └── Serialization logic
- * 
- * Problemas: 
- * - 1 clase = N responsabilidades (violación de SRP)
- * - Difícil de testear
- * - Difícil de reutilizar
- * - Difícil de expandir
- * 
- * 
- * ======================== DESPUÉS (SOLID) ========================
- * 
- * game/
- * ├── services/
- * │   ├── network/
- * │   │   ├── network_service.dart       (Interfaz)
- * │   │   ├── remote_network_service.dart (Implementación remota)
- * │   │   ├── local_network_service.dart  (Implementación local)
- * │   │   └── network_message.dart        (DTOs)
- * │   ├── game_state_service.dart        (Gestiona estado)
- * │   ├── room_service.dart              (Gestiona salas)
- * │   └── player_service.dart            (Gestiona jugadores)
- * ├── models/
- * │   ├── player.dart
- * │   ├── room.dart
- * │   ├── game_state.dart
- * │   └── enums.dart
- * ├── screens/
- * │   ├── base_screen.dart               (Interfaz)
- * │   ├── waiting_room_screen.dart       (Ya refactorizado)
- * │   └── play_screen.dart
- * ├── app_controller.dart                (Orquesta servicios)
- * └── app_view.dart                      (UI)
- * 
- * Ventajas:
- * ✓ Cada clase tiene UNA responsabilidad
- * ✓ Fácil de testear (depender de interfaces)
- * ✓ Fácil de reutilizar (servicios independientes)
- * ✓ Fácil de expandir (agregar nuevos servicios)
- * ✓ Fácil de demostrar (código limpio y documentado)
- * 
- * 
- * ======================== MAPEO DE MIGRACIÓN ========================
- * 
- * AppData.isConnected
- *   → GameStateService.gamePhase
- * 
- * AppData.players
- *   → RoomService.room.players
- * 
- * AppData._connectToWebSocket()
- *   → NetworkService.connect()
- * 
- * AppData.updateMovementDirection()
- *   → PlayerService.updateDirection() + NetworkService.sendMessage()
- * 
- * AppData.requestMatchStart()
- *   → RoomService.startMatch() + NetworkService.sendMessage()
- * 
- * 
- * ======================== INTERFACES CLAVE ========================
- * 
- * INetworkService (Dependency Inversion)
- * - connect(config)
- * - disconnect()
- * - sendMessage(type, payload)
- * - onMessageReceived() → Stream
- * 
- * IGameStateService
- * - updatePhase(MatchPhase)
- * - updateCountdown(int)
- * - getGameState() → GameState
- * 
- * IRoomService
- * - joinRoom(code)
- * - startRoom()
- * - getRoomInfo() → Room
- * 
- * IPlayerService
- * - getLocalPlayer() → Player
- * - updatePlayerMovement(direction)
- * - getAllPlayers() → List<Player>
- * 
- * 
- * ======================== SECUENCIA DE IMPLEMENTACIÓN ========================
- * 
- * Día 1-2: Crear interfaces y modelos
- * - types y enums
- * - DTOs (Data Transfer Objects)
- * - interfaces de servicios
- * 
- * Día 3-4: Implementar servicios
- * - LocalNetworkService (para modo local)
- * - RemoteNetworkService (para modo remoto)
- * - GameStateService
- * - RoomService
- * - PlayerService
- * 
- * Día 5: Migrar AppData → AppController
- * - Usar servicios inyectados
- * - Mantener compatibilidad con UI existente
- * 
- * Día 6: Refactorizar screens
- * - Usar AppController en lugar de AppData
- * - Screens implementan interfaz base
- * 
- * Día 7: Testing + Demo
- * - Tests unitarios para servicios
- * - Demo del sprint
- * 
- * 
- * ======================== BENEFICIOS ========================
- * 
- * Para Desarrollo:
- * - Código más legible (cada clase = 1 cosa)
- * - Más fácil de debuggear (responsabilidades claras)
- * - Más fácil de testear (interfaces permiten mocks)
- * - Menos coupling (servicios independientes)
- * - Más fácil de escalar (agregar features sin romper)
- * 
- * Para Demostraciones Semanales:
- * - Código limpio = fácil explicar progreso
- * - Interfaces claras = fácil mostrar arquitectura
- * - Servicios separados = fácil mostrar modo local vs remoto
- * - DTOs = fácil entender flujo de datos
- * - Tests = fácil probar funcionalidad
- */
+/// REFACTORIZACIÓN DEL CLIENTE FLUTTER - PRINCIPIOS SOLID
+/// 
+/// CAMBIOS PLANEADOS:
+/// 
+/// ======================== ANTES (Anti-pattern) ========================
+/// 
+/// AppData (monolito)
+/// ├── WebSocket connection
+/// ├── Game state management
+/// ├── Player logic
+/// ├── Room management
+/// ├── Movement updates
+/// └── Serialization logic
+/// 
+/// Problemas: 
+/// - 1 clase = N responsabilidades (violación de SRP)
+/// - Difícil de testear
+/// - Difícil de reutilizar
+/// - Difícil de expandir
+/// 
+/// 
+/// ======================== DESPUÉS (SOLID) ========================
+/// 
+/// game/
+/// ├── services/
+/// │   ├── network/
+/// │   │   ├── network_service.dart       (Interfaz)
+/// │   │   ├── remote_network_service.dart (Implementación remota)
+/// │   │   ├── local_network_service.dart  (Implementación local)
+/// │   │   └── network_message.dart        (DTOs)
+/// │   ├── game_state_service.dart        (Gestiona estado)
+/// │   ├── room_service.dart              (Gestiona salas)
+/// │   └── player_service.dart            (Gestiona jugadores)
+/// ├── models/
+/// │   ├── player.dart
+/// │   ├── room.dart
+/// │   ├── game_state.dart
+/// │   └── enums.dart
+/// ├── screens/
+/// │   ├── base_screen.dart               (Interfaz)
+/// │   ├── waiting_room_screen.dart       (Ya refactorizado)
+/// │   └── play_screen.dart
+/// ├── app_controller.dart                (Orquesta servicios)
+/// └── app_view.dart                      (UI)
+/// 
+/// Ventajas:
+/// ✓ Cada clase tiene UNA responsabilidad
+/// ✓ Fácil de testear (depender de interfaces)
+/// ✓ Fácil de reutilizar (servicios independientes)
+/// ✓ Fácil de expandir (agregar nuevos servicios)
+/// ✓ Fácil de demostrar (código limpio y documentado)
+/// 
+/// 
+/// ======================== MAPEO DE MIGRACIÓN ========================
+/// 
+/// AppData.isConnected
+///   → GameStateService.gamePhase
+/// 
+/// AppData.players
+///   → RoomService.room.players
+/// 
+/// AppData._connectToWebSocket()
+///   → NetworkService.connect()
+/// 
+/// AppData.updateMovementDirection()
+///   → PlayerService.updateDirection() + NetworkService.sendMessage()
+/// 
+/// AppData.requestMatchStart()
+///   → RoomService.startMatch() + NetworkService.sendMessage()
+/// 
+/// 
+/// ======================== INTERFACES CLAVE ========================
+/// 
+/// INetworkService (Dependency Inversion)
+/// - connect(config)
+/// - disconnect()
+/// - sendMessage(type, payload)
+/// - onMessageReceived() → Stream
+/// 
+/// IGameStateService
+/// - updatePhase(MatchPhase)
+/// - updateCountdown(int)
+/// - getGameState() → GameState
+/// 
+/// IRoomService
+/// - joinRoom(code)
+/// - startRoom()
+/// - getRoomInfo() → Room
+/// 
+/// IPlayerService
+/// - getLocalPlayer() → Player
+/// - updatePlayerMovement(direction)
+/// - getAllPlayers() → List<Player>
+/// 
+/// 
+/// ======================== SECUENCIA DE IMPLEMENTACIÓN ========================
+/// 
+/// Día 1-2: Crear interfaces y modelos
+/// - types y enums
+/// - DTOs (Data Transfer Objects)
+/// - interfaces de servicios
+/// 
+/// Día 3-4: Implementar servicios
+/// - LocalNetworkService (para modo local)
+/// - RemoteNetworkService (para modo remoto)
+/// - GameStateService
+/// - RoomService
+/// - PlayerService
+/// 
+/// Día 5: Migrar AppData → AppController
+/// - Usar servicios inyectados
+/// - Mantener compatibilidad con UI existente
+/// 
+/// Día 6: Refactorizar screens
+/// - Usar AppController en lugar de AppData
+/// - Screens implementan interfaz base
+/// 
+/// Día 7: Testing + Demo
+/// - Tests unitarios para servicios
+/// - Demo del sprint
+/// 
+/// 
+/// ======================== BENEFICIOS ========================
+/// 
+/// Para Desarrollo:
+/// - Código más legible (cada clase = 1 cosa)
+/// - Más fácil de debuggear (responsabilidades claras)
+/// - Más fácil de testear (interfaces permiten mocks)
+/// - Menos coupling (servicios independientes)
+/// - Más fácil de escalar (agregar features sin romper)
+/// 
+/// Para Demostraciones Semanales:
+/// - Código limpio = fácil explicar progreso
+/// - Interfaces claras = fácil mostrar arquitectura
+/// - Servicios separados = fácil mostrar modo local vs remoto
+/// - DTOs = fácil entender flujo de datos
+/// - Tests = fácil probar funcionalidad
+library;
 
 // EJEMPLO: Cómo se vería el código refactorizado
 
@@ -231,7 +230,7 @@ class RemoteNetworkService implements INetworkService {
 }
 
 class GameStateService implements IGameStateService {
-  GameState _state = GameState();
+  final GameState _state = GameState();
 
   @override
   void updatePhase(MatchPhase phase) {

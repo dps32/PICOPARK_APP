@@ -1,7 +1,6 @@
-/**
- * Game Enums and Constants
- * Valores compartidos en todo el juego
- */
+/// Game Enums and Constants
+/// Valores compartidos en todo el juego
+library;
 
 enum MatchPhase { connecting, waiting, playing, finished }
 

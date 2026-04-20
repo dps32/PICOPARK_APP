@@ -405,8 +405,8 @@ class AppData extends ChangeNotifier {
     _markConnected();
     playerId = 'local_player_${DateTime.now().millisecondsSinceEpoch}';
     roomCode = 'LOCAL';
-    roomStatus = 'lobby';
-    phase = MatchPhase.waiting;
+    roomStatus = 'in_game';
+    phase = MatchPhase.playing;
     isRoomHost = true;
     minPlayers = _minimumPlayersRequired;
     maxPlayers = 8;
@@ -449,7 +449,7 @@ class AppData extends ChangeNotifier {
       ),
     };
     
-    players = <MultiplayerPlayer>[localPlayer];
+    players = _applyLocalBots(<MultiplayerPlayer>[localPlayer]);
     
     if (kDebugMode) {
       print('[LOCAL MODE] Jugador local registrat: $playerId ($playerName)');

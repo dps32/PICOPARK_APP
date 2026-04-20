@@ -1,8 +1,7 @@
-/**
- * Local Network Service
- * Implementación de INetworkService para modo local (sin servidor)
- * Simula un servidor en memoria
- */
+/// Local Network Service
+/// Implementación de INetworkService para modo local (sin servidor)
+/// Simula un servidor en memoria
+library;
 
 import 'package:flutter/foundation.dart';
 import 'dart:async';

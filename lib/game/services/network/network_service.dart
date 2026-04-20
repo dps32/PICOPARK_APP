@@ -1,8 +1,7 @@
-/**
- * Network Service Interface
- * Define el contrato que todos los servicios de red deben cumplir
- * Permite Dependency Inversion (SOLID)
- */
+/// Network Service Interface
+/// Define el contrato que todos los servicios de red deben cumplir
+/// Permite Dependency Inversion (SOLID)
+library;
 
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';

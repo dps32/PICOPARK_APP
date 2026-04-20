@@ -78,8 +78,10 @@ class PlayScreen extends ScreenAdapter {
     elapsedSeconds += math.max(0, math.min(delta, maxFrameSeconds));
 
     final AppData appData = game.getAppData();
-    if (appData.phase == MatchPhase.waiting ||
-        appData.phase == MatchPhase.connecting) {
+    // Solo vuelve a WaitingRoom si NO está en LOCAL mode (LOCAL mode siempre juega)
+    if ((appData.phase == MatchPhase.waiting ||
+      appData.phase == MatchPhase.connecting) &&
+      appData.roomCode != 'LOCAL') {
       _submitDirection(appData, 'none');
       game.setScreen(WaitingRoomScreen(game, levelIndex));
       return;
@@ -432,13 +434,21 @@ class PlayScreen extends ScreenAdapter {
     final double viewW = math.max(1, viewport.worldWidth);
     final double viewH = math.max(1, viewport.worldHeight);
     final double halfW = viewW * 0.5;
+    final double halfH = viewH * 0.5;
 
     final double targetX = clampDouble(
       player.x + player.width * 0.5,
       halfW,
       worldW - halfW,
     );
-    final double targetY = worldH * 0.5;
+    
+    // Vista de plataforma 2D: La cámara sigue al jugador en Y, 
+    // posicionada más abajo (35% arriba del jugador)
+    final double targetY = clampDouble(
+      player.y + player.height * 0.5 - (viewH * 0.35),
+      halfH,
+      worldH - halfH,
+    );
 
     camera.setPosition(targetX, targetY);
     camera.update();

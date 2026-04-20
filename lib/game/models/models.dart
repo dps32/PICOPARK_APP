@@ -1,7 +1,6 @@
-/**
- * Game Models
- * Modelos de datos del juego siguiendo SOLID principles
- */
+/// Game Models
+/// Modelos de datos del juego siguiendo SOLID principles
+library;
 
 import 'enums.dart';
 
