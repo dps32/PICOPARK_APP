@@ -90,6 +90,7 @@ class PlayScreen extends ScreenAdapter {
     }
 
     _submitDirection(appData, _readCurrentDirection());
+    _handleJumpInput(appData);
     _applyServerLayerTransforms(appData.layerTransforms);
     _applyServerZoneTransforms(appData.zoneTransforms);
     _updateCameraForGameplay(appData.localPlayer);
@@ -390,6 +391,12 @@ class PlayScreen extends ScreenAdapter {
     appData.updateMovementDirection(direction);
   }
 
+  void _handleJumpInput(AppData appData) {
+    if (Gdx.input.isKeyJustPressed(Input.keys.space)) {
+      appData.requestJump();
+    }
+  }
+
   String _readCurrentDirection() {
     final bool left =
         Gdx.input.isKeyPressed(Input.keys.left) ||
@@ -397,31 +404,7 @@ class PlayScreen extends ScreenAdapter {
     final bool right =
         Gdx.input.isKeyPressed(Input.keys.right) ||
         Gdx.input.isKeyPressed(Input.keys.d);
-    final bool up =
-        Gdx.input.isKeyPressed(Input.keys.up) ||
-        Gdx.input.isKeyPressed(Input.keys.w);
-    final bool down =
-        Gdx.input.isKeyPressed(Input.keys.down) ||
-        Gdx.input.isKeyPressed(Input.keys.s);
 
-    if (up && left) {
-      return 'upLeft';
-    }
-    if (up && right) {
-      return 'upRight';
-    }
-    if (down && left) {
-      return 'downLeft';
-    }
-    if (down && right) {
-      return 'downRight';
-    }
-    if (up) {
-      return 'up';
-    }
-    if (down) {
-      return 'down';
-    }
     if (left) {
       return 'left';
     }
@@ -449,17 +432,13 @@ class PlayScreen extends ScreenAdapter {
     final double viewW = math.max(1, viewport.worldWidth);
     final double viewH = math.max(1, viewport.worldHeight);
     final double halfW = viewW * 0.5;
-    final double halfH = viewH * 0.5;
+
     final double targetX = clampDouble(
       player.x + player.width * 0.5,
       halfW,
       worldW - halfW,
     );
-    final double targetY = clampDouble(
-      player.y + player.height * 0.5,
-      halfH,
-      worldH - halfH,
-    );
+    final double targetY = worldH * 0.5;
 
     camera.setPosition(targetX, targetY);
     camera.update();

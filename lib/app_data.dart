@@ -278,6 +278,13 @@ class AppData extends ChangeNotifier {
     _sendMessage(<String, dynamic>{'type': 'direction', 'value': normalized});
   }
 
+  void requestJump() {
+    if (!canMove) {
+      return;
+    }
+    _sendMessage(<String, dynamic>{'type': 'jump'});
+  }
+
   void requestMatchRestart() {
     if (!canRequestMatchRestart) {
       return;
