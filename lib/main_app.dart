@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
@@ -16,7 +17,7 @@ class MainApp {
 
   static Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
-    await configureGameWindow('Game Example - Flutter');
+    await configureGameWindow('NetanFruits');
     runApp(const _GameRoot());
   }
 }
@@ -40,11 +41,18 @@ class _GameRootState extends State<_GameRoot> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Game Example - Flutter',
+      title: 'NetanFruits',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF0038B8),
+          onPrimary: Colors.white,
+          secondary: Colors.white,
+          onSecondary: Color(0xFF0038B8),
+          surface: Colors.white,
+          onSurface: Color(0xFF6F7682),
+        ),
       ),
       home: Scaffold(
         body: SafeArea(
@@ -229,6 +237,7 @@ class _GameViewState extends State<_GameView>
   int _lastGameWidth = -1;
   int _lastGameHeight = -1;
   bool _lastLetterboxedMode = true;
+  String _joystickDirection = 'none';
 
   @override
   void initState() {
@@ -264,6 +273,7 @@ class _GameViewState extends State<_GameView>
 
   @override
   void dispose() {
+    _releaseJoystickDirection();
     _ticker?.dispose();
     _focusNode.dispose();
     _game.dispose();
@@ -285,7 +295,7 @@ class _GameViewState extends State<_GameView>
   }
 
   bool _isLetterboxedMode() {
-    return _game.getScreen() is! PlayScreen;
+    return false;
   }
 
   Offset? _toGameOffset(Offset localPosition) {
@@ -346,6 +356,52 @@ class _GameViewState extends State<_GameView>
     Gdx.input.onPointerUp(gameOffset.dx, gameOffset.dy);
   }
 
+  bool _showMobileControls(BoxConstraints constraints) {
+    final TargetPlatform platform = defaultTargetPlatform;
+    final bool isMobilePlatform =
+        platform == TargetPlatform.android || platform == TargetPlatform.iOS;
+    return isMobilePlatform;
+  }
+
+  void _setJoystickDirection(String nextDirection) {
+    if (_joystickDirection == nextDirection) {
+      return;
+    }
+
+    _releaseJoystickDirection();
+    _joystickDirection = nextDirection;
+
+    switch (nextDirection) {
+      case 'left':
+        Gdx.input.onKeyDown(Input.keys.left);
+        break;
+      case 'right':
+        Gdx.input.onKeyDown(Input.keys.right);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _releaseJoystickDirection() {
+    switch (_joystickDirection) {
+      case 'left':
+        Gdx.input.onKeyUp(Input.keys.left);
+        break;
+      case 'right':
+        Gdx.input.onKeyUp(Input.keys.right);
+        break;
+      default:
+        break;
+    }
+    _joystickDirection = 'none';
+  }
+
+  void _tapJump() {
+    Gdx.input.onKeyDown(Input.keys.space);
+    Gdx.input.onKeyUp(Input.keys.space);
+  }
+
   void _resizeGameIfNeeded(int width, int height, bool letterboxedMode) {
     if (width == _lastGameWidth &&
         height == _lastGameHeight &&
@@ -375,6 +431,7 @@ class _GameViewState extends State<_GameView>
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           _surfaceSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final bool showMobileControls = _showMobileControls(constraints);
           if (_isLetterboxedMode()) {
             _updateLetterbox(_surfaceSize);
           } else {
@@ -481,6 +538,23 @@ class _GameViewState extends State<_GameView>
                       child: const Text('Restart Match'),
                     ),
                   ),
+                if (showMobileControls)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        _VirtualJoystick(
+                          onDirectionChanged: _setJoystickDirection,
+                          onDirectionReleased: _releaseJoystickDirection,
+                        ),
+                        _JumpButton(onTap: _tapJump),
+                      ],
+                    ),
+                  ),
               ],
             ),
           );
@@ -502,4 +576,144 @@ class _GamePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GamePainter oldDelegate) => true;
+}
+
+class _VirtualJoystick extends StatefulWidget {
+  final ValueChanged<String> onDirectionChanged;
+  final VoidCallback onDirectionReleased;
+
+  const _VirtualJoystick({
+    required this.onDirectionChanged,
+    required this.onDirectionReleased,
+  });
+
+  @override
+  State<_VirtualJoystick> createState() => _VirtualJoystickState();
+}
+
+class _VirtualJoystickState extends State<_VirtualJoystick> {
+  static const double _size = 150;
+  static const double _knobSize = 64;
+  static const double _deadZone = 16;
+
+  Offset _knobOffset = Offset.zero;
+
+  void _updateFromPosition(Offset localPosition) {
+    final Offset center = const Offset(_size / 2, _size / 2);
+    final Offset delta = localPosition - center;
+    final double maxTravel = (_size - _knobSize) * 0.5;
+    final Offset clamped = _clampToCircle(delta, maxTravel);
+
+    setState(() {
+      _knobOffset = clamped;
+    });
+
+    String direction = 'none';
+    if (delta.dx <= -_deadZone) {
+      direction = 'left';
+    } else if (delta.dx >= _deadZone) {
+      direction = 'right';
+    }
+
+    widget.onDirectionChanged(direction);
+  }
+
+  Offset _clampToCircle(Offset value, double radius) {
+    final double distance = value.distance;
+    if (distance <= radius || distance == 0) {
+      return value;
+    }
+    return value * (radius / distance);
+  }
+
+  void _reset() {
+    setState(() {
+      _knobOffset = Offset.zero;
+    });
+    widget.onDirectionReleased();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color baseColor = const Color(0xFF6F7682).withValues(alpha: 0.24);
+    final Color borderColor = Colors.white.withValues(alpha: 0.55);
+    final Color knobColor = const Color(0xFF0038B8).withValues(alpha: 0.82);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (DragStartDetails details) => _updateFromPosition(details.localPosition),
+      onPanUpdate: (DragUpdateDetails details) => _updateFromPosition(details.localPosition),
+      onPanEnd: (_) => _reset(),
+      onPanCancel: _reset,
+      child: SizedBox(
+        width: _size,
+        height: _size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Container(
+              width: _size,
+              height: _size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: baseColor,
+                border: Border.all(color: borderColor, width: 2),
+              ),
+            ),
+            Transform.translate(
+              offset: _knobOffset,
+              child: Container(
+                width: _knobSize,
+                height: _knobSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: knobColor,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _JumpButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _JumpButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => onTap(),
+      child: Container(
+        width: 110,
+        height: 110,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF0038B8).withValues(alpha: 0.84),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: const Color(0xFF6F7682).withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: const Text(
+          'JUMP',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ),
+    );
+  }
 }

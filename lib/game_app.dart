@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
 
 import 'app_data.dart';
 import 'libgdx_compat/asset_manager.dart';

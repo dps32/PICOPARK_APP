@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'app_data.dart';
@@ -11,43 +12,47 @@ import 'level_loader.dart';
 import 'play_screen.dart';
 
 class WaitingRoomScreen extends ScreenAdapter {
-  static const double worldWidth = 1280;
-  static const double worldHeight = 720;
-  static const double cardWidth = 760;
-  static const double cardHeight = 560;
-  static const double listInset = 48;
-  static const double listTop = 250;
-  static const double listRowHeight = 42;
-  static const double playButtonWidth = 280;
-  static const double playButtonHeight = 68;
+  static const double _baseCardWidth = 760;
+  static const double _baseCardHeight = 560;
+  static const double _baseListInset = 48;
+  static const double _baseListTop = 250;
+  static const double _baseListRowHeight = 42;
+  static const double _basePlayButtonWidth = 280;
+  static const double _basePlayButtonHeight = 68;
+  static const double _baseTitleScale = 2.6;
+  static const double _baseRoomScale = 1.2;
+  static const double _basePlayersScale = 1.7;
+  static const double _baseSectionScale = 1.15;
+  static const double _baseEmptyScale = 1.2;
+  static const double _baseButtonScale = 1.75;
+  static const double _baseNoteScale = 1.0;
 
-  static final ui.Color background = colorValueOf('F6F8FB');
+  static final ui.Color background = colorValueOf('FFFFFF');
   static final ui.Color cardFill = colorValueOf('FFFFFF');
-  static final ui.Color cardStroke = colorValueOf('D7DEE8');
-  static final ui.Color titleColor = colorValueOf('162033');
-  static final ui.Color textColor = colorValueOf('314058');
-  static final ui.Color dimTextColor = colorValueOf('6D7C93');
-  static final ui.Color accentColor = colorValueOf('2D7DFF');
-  static final ui.Color localPlayerColor = colorValueOf('0D58D8');
-  static final ui.Color listFill = colorValueOf('F9FBFF');
-  static final ui.Color listStroke = colorValueOf('DCE6F5');
-  static final ui.Color playButtonFill = colorValueOf('2D7DFF');
-  static final ui.Color playButtonDisabledFill = colorValueOf('B6C4D8');
-  static final ui.Color playButtonStroke = colorValueOf('1F63CF');
-  static final ui.Color playButtonDisabledStroke = colorValueOf('AAB8CA');
-  static final ui.Color errorColor = colorValueOf('C44545');
+  static final ui.Color cardStroke = colorValueOf('9FA4AD');
+  static final ui.Color titleColor = colorValueOf('0038B8');
+  static final ui.Color textColor = colorValueOf('6F7682');
+  static final ui.Color dimTextColor = colorValueOf('9FA4AD');
+  static final ui.Color accentColor = colorValueOf('0038B8');
+  static final ui.Color localPlayerColor = colorValueOf('0038B8');
+  static final ui.Color listFill = colorValueOf('FFFFFF');
+  static final ui.Color listStroke = colorValueOf('9FA4AD');
+  static final ui.Color playButtonFill = colorValueOf('0038B8');
+  static final ui.Color playButtonDisabledFill = colorValueOf('B7BDC7');
+  static final ui.Color playButtonStroke = colorValueOf('0038B8');
+  static final ui.Color playButtonDisabledStroke = colorValueOf('9FA4AD');
+  static final ui.Color errorColor = colorValueOf('6F7682');
 
   final GameApp game;
   final int levelIndex;
-  final Viewport viewport = FitViewport(
-    worldWidth,
-    worldHeight,
+  final Viewport viewport = ScreenViewport(
     OrthographicCamera(),
   );
   final GlyphLayout layout = GlyphLayout();
   final Vector3 pointer = Vector3(0, 0, 0);
   final Rectangle playButtonBounds = Rectangle();
   late final LevelData levelData;
+  bool _touchStartHandled = false;
 
   WaitingRoomScreen(this.game, this.levelIndex) {
     levelData = LevelLoader.loadLevel(levelIndex);
@@ -66,11 +71,21 @@ class WaitingRoomScreen extends ScreenAdapter {
       return;
     }
 
-    ScreenUtils.clear(background);
+    ScreenUtils.clear(levelData.backgroundColor);
     viewport.apply();
 
-    final double cardX = (worldWidth - cardWidth) * 0.5;
-    final double cardY = (worldHeight - cardHeight) * 0.5;
+    final double screenWidth = viewport.worldWidth;
+    final double screenHeight = viewport.worldHeight;
+    final double scale = math.min(screenWidth / 1280.0, screenHeight / 720.0)
+        .clamp(0.78, 1.35);
+    final double cardWidth = _baseCardWidth * scale;
+    final double cardHeight = _baseCardHeight * scale;
+    final double listInset = _baseListInset * scale;
+    final double listTop = _baseListTop * scale;
+    final double listRowHeight = _baseListRowHeight * scale;
+
+    final double cardX = (screenWidth - cardWidth) * 0.5;
+    final double cardY = (screenHeight - cardHeight) * 0.5;
     final double listX = cardX + listInset;
     final double listY = cardY + listTop;
     final double listWidth = cardWidth - listInset * 2;
@@ -116,13 +131,22 @@ class WaitingRoomScreen extends ScreenAdapter {
     final BitmapFont font = game.getFont();
     batch.begin();
 
-    _drawCenteredText(batch, font, 'Waiting Room', cardY + 72, 2.6, titleColor);
+    _drawCenteredText(
+      batch,
+      font,
+      'Waiting Room',
+      screenWidth,
+      cardY + 72,
+      _baseTitleScale * scale,
+      titleColor,
+    );
     _drawCenteredText(
       batch,
       font,
       'Room ${appData.roomLabel}',
+      screenWidth,
       cardY + 110,
-      1.2,
+      _baseRoomScale * scale,
       dimTextColor,
     );
 
@@ -132,8 +156,9 @@ class WaitingRoomScreen extends ScreenAdapter {
       batch,
       font,
       playersCounter,
+      screenWidth,
       cardY + 156,
-      1.7,
+      _basePlayersScale * scale,
       accentColor,
     );
 
@@ -141,8 +166,9 @@ class WaitingRoomScreen extends ScreenAdapter {
       batch,
       font,
       'Players in room',
+      screenWidth,
       listY - 18,
-      1.15,
+      _baseSectionScale * scale,
       dimTextColor,
     );
 
@@ -152,8 +178,9 @@ class WaitingRoomScreen extends ScreenAdapter {
         batch,
         font,
         'No players connected yet',
+        screenWidth,
         listY + 108,
-        1.2,
+        _baseEmptyScale * scale,
         dimTextColor,
       );
     } else {
@@ -168,7 +195,7 @@ class WaitingRoomScreen extends ScreenAdapter {
           label,
           listX + 20,
           rowY,
-          1.2,
+          _baseEmptyScale * scale,
           isLocalPlayer ? localPlayerColor : textColor,
         );
         rowY += listRowHeight;
@@ -182,8 +209,9 @@ class WaitingRoomScreen extends ScreenAdapter {
       batch,
       font,
       canStart ? 'Play (Enter)' : 'Play',
+      screenWidth,
       playButtonBounds.y + playButtonBounds.height * 0.67,
-      1.75,
+      _baseButtonScale * scale,
       colorValueOf('FFFFFF'),
     );
 
@@ -192,8 +220,9 @@ class WaitingRoomScreen extends ScreenAdapter {
         batch,
         font,
         'Need at least ${appData.minPlayers} players',
+        screenWidth,
         playButtonBounds.y - 18,
-        1.0,
+        _baseNoteScale * scale,
         dimTextColor,
       );
     }
@@ -204,8 +233,9 @@ class WaitingRoomScreen extends ScreenAdapter {
         batch,
         font,
         roomError,
+        screenWidth,
         playButtonBounds.y - 42,
-        0.95,
+        0.95 * scale,
         errorColor,
       );
     }
@@ -217,6 +247,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     SpriteBatch batch,
     BitmapFont font,
     String text,
+    double worldWidth,
     double y,
     double scale,
     ui.Color color,
@@ -230,8 +261,14 @@ class WaitingRoomScreen extends ScreenAdapter {
   }
 
   void _updatePlayButtonBounds() {
-    final double x = worldWidth * 0.5 - playButtonWidth * 0.5;
-    final double y = worldHeight * 0.5 + 180;
+    final double screenWidth = viewport.worldWidth;
+    final double screenHeight = viewport.worldHeight;
+    final double scale = math.min(screenWidth / 1280.0, screenHeight / 720.0)
+        .clamp(0.78, 1.35);
+    final double playButtonWidth = _basePlayButtonWidth * scale;
+    final double playButtonHeight = _basePlayButtonHeight * scale;
+    final double x = screenWidth * 0.5 - playButtonWidth * 0.5;
+    final double y = screenHeight * 0.5 + 180 * scale;
     playButtonBounds.set(x, y, playButtonWidth, playButtonHeight);
   }
 
@@ -246,7 +283,9 @@ class WaitingRoomScreen extends ScreenAdapter {
       return;
     }
 
-    if (!Gdx.input.justTouched()) {
+    final bool touchActive = Gdx.input.justTouched() || Gdx.input.isTouchDown();
+    if (!touchActive) {
+      _touchStartHandled = false;
       return;
     }
 
@@ -254,8 +293,15 @@ class WaitingRoomScreen extends ScreenAdapter {
       pointer.set(Gdx.input.getX().toDouble(), Gdx.input.getY().toDouble(), 0),
     );
 
-    if (playButtonBounds.contains(pointer.x, pointer.y)) {
+    final bool insideButton = playButtonBounds.contains(pointer.x, pointer.y);
+    if (insideButton && !_touchStartHandled) {
+      _touchStartHandled = true;
       appData.requestMatchStart();
+      return;
+    }
+
+    if (!insideButton) {
+      _touchStartHandled = false;
     }
   }
 
@@ -276,6 +322,6 @@ class WaitingRoomScreen extends ScreenAdapter {
 
   @override
   void resize(int width, int height) {
-    viewport.update(width.toDouble(), height.toDouble(), true);
+    viewport.update(width.toDouble(), height.toDouble(), false);
   }
 }

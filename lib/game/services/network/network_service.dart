@@ -3,7 +3,6 @@
 /// Permite Dependency Inversion (SOLID)
 library;
 
-import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 
 /// DTO para mensajes de red

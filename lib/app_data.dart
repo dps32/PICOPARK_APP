@@ -274,6 +274,9 @@ class AppData extends ChangeNotifier {
     _connectToWebSocket();
   }
 
+  /// Actualiza la dirección de movimiento del jugador local
+  /// Normaliza el valor y lo envía al servidor
+  /// La dirección puede ser 'left', 'right' o 'none'
   void updateMovementDirection(String direction) {
     final String normalized = _normalizeDirection(direction);
     if (_lastDirection == normalized) {
@@ -283,6 +286,9 @@ class AppData extends ChangeNotifier {
     _sendMessage(<String, dynamic>{'type': 'direction', 'value': normalized});
   }
 
+  /// Solicita un salto para el jugador local
+  /// Solo se ejecuta si el jugador puede moverse
+  /// El servidor es responsable de validar si el salto es válido
   void requestJump() {
     if (!canMove) {
       return;
@@ -300,7 +306,7 @@ class AppData extends ChangeNotifier {
   void requestMatchStart() {
     if (!canRequestMatchStart) {
       if (kDebugMode) {
-        print('[PLAY BUTTON] No es pot iniciar: isConnected=$isConnected, phase=$phase, isRoomHost=$isRoomHost, players=${players.length}/${minPlayers}');
+        print('[PLAY BUTTON] No es pot iniciar: isConnected=$isConnected, phase=$phase, isRoomHost=$isRoomHost, players=$players.length/$minPlayers');
       }
       return;
     }

@@ -5,35 +5,34 @@ import 'game_app.dart';
 import 'libgdx_compat/game_framework.dart';
 import 'libgdx_compat/math_types.dart';
 import 'libgdx_compat/viewport.dart';
+import 'level_data.dart';
+import 'level_loader.dart';
 import 'play_screen.dart';
 
 class LoadingScreen extends ScreenAdapter {
-  static const double worldWidth = 1280;
-  static const double worldHeight = 720;
-  static const double minSecondsOnScreen = 0.85;
+  static const double minSecondsOnScreen = 3.85;
   static const double visualProgressSpeed = 3.2;
 
-  static final ui.Color background = colorValueOf('050A06');
-  static final ui.Color barBg = colorValueOf('0A1A0F');
-  static final ui.Color barFill = colorValueOf('35FF74');
-  static final ui.Color textColor = colorValueOf('35FF74');
-  static final ui.Color subtextColor = colorValueOf('21964A');
+  static final ui.Color background = colorValueOf('FFFFFF');
+  static final ui.Color textColor = colorValueOf('0038B8');
+  static final ui.Color subtextColor = colorValueOf('7A7A7A');
 
   final GameApp game;
   final int levelIndex;
-  final Viewport viewport = FitViewport(
-    worldWidth,
-    worldHeight,
+  final Viewport viewport = ScreenViewport(
     OrthographicCamera(),
   );
   final GlyphLayout layout = GlyphLayout();
+  late final LevelData levelData;
 
   double elapsedSeconds = 0;
   double visualProgress = 0;
 
   bool _levelReady = false;
 
-  LoadingScreen(this.game, this.levelIndex);
+  LoadingScreen(this.game, this.levelIndex) {
+    levelData = LevelLoader.loadLevel(levelIndex);
+  }
 
   @override
   void show() {
@@ -73,38 +72,16 @@ class LoadingScreen extends ScreenAdapter {
       return;
     }
 
-    ScreenUtils.clear(background);
+    ScreenUtils.clear(levelData.backgroundColor);
     viewport.apply();
 
-    _renderBar(visualProgress);
     _renderText(visualProgress);
   }
 
-  void _renderBar(double progress) {
-    final double clamped = clampDouble(progress, 0, 1);
-    const double barWidth = 620;
-    const double barHeight = 28;
-    final double x = (worldWidth - barWidth) * 0.5;
-    final double y = worldHeight * 0.44;
-
-    final ShapeRenderer shapes = game.getShapeRenderer();
-    shapes.setProjectionMatrix(viewport.getCamera().combined);
-
-    shapes.begin(ShapeType.filled);
-    shapes.setColor(barBg);
-    shapes.rect(x, y, barWidth, barHeight);
-    shapes.setColor(barFill);
-    shapes.rect(x, y, barWidth * clamped, barHeight);
-    shapes.end();
-
-    shapes.begin(ShapeType.line);
-    shapes.setColor(barFill);
-    shapes.rect(x, y, barWidth, barHeight);
-    shapes.end();
-  }
-
   void _renderText(double progress) {
-    final double clamped = clampDouble(progress, 0, 1);
+    final double screenWidth = viewport.worldWidth;
+    final double screenHeight = viewport.worldHeight;
+    final String loadingLabel = _loadingLabel();
 
     final SpriteBatch batch = game.getBatch();
     final BitmapFont font = game.getFont();
@@ -114,27 +91,31 @@ class LoadingScreen extends ScreenAdapter {
     _drawCenteredText(
       batch,
       font,
-      'Loading ${game.getLevelName(levelIndex)}',
-      worldHeight * 0.58,
-      2,
+      loadingLabel,
+      screenWidth,
+      screenHeight * 0.44,
+      _scaleForWidth(screenWidth, 1.9),
       textColor,
-    );
-    _drawCenteredText(
-      batch,
-      font,
-      '${(clamped * 100).round()}%',
-      worldHeight * 0.40,
-      1.5,
-      subtextColor,
     );
 
     batch.end();
+  }
+
+  String _loadingLabel() {
+    final int dots = (elapsedSeconds * 3).floor() % 4;
+    return 'Cargando${'.' * dots}';
+  }
+
+  double _scaleForWidth(double screenWidth, double baseScale) {
+    final double factor = (screenWidth / 1280.0).clamp(0.75, 1.35);
+    return baseScale * factor;
   }
 
   void _drawCenteredText(
     SpriteBatch batch,
     BitmapFont font,
     String text,
+    double worldWidth,
     double y,
     double scale,
     ui.Color color,
@@ -149,6 +130,6 @@ class LoadingScreen extends ScreenAdapter {
 
   @override
   void resize(int width, int height) {
-    viewport.update(width.toDouble(), height.toDouble(), true);
+    viewport.update(width.toDouble(), height.toDouble(), false);
   }
 }

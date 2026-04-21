@@ -13,7 +13,6 @@ import 'libgdx_compat/viewport.dart';
 import 'level_data.dart';
 import 'level_loader.dart';
 import 'level_renderer.dart';
-import 'player_list_renderer.dart';
 import 'runtime_transform.dart';
 import 'waiting_room_screen.dart';
 
@@ -25,15 +24,24 @@ class PlayScreen extends ScreenAdapter {
   static const double maxFrameSeconds = 0.25;
   static const double remotePlayerOpacity = 0.5;
   static const double localPlayerRingPadding = 6;
+  static const List<String> _playerSkinAnimations = <String>[
+    'netanzana',
+    'netanera',
+    'netanano',
+    'netanuva',
+    'netananja',
+    'netanimon',
+    'netaniña',
+  ];
   static const double cameraDeadZoneX = 3.0;
   static const double cameraFollowLerp = 0.18;
 
   static final ui.Color panelFill = colorValueOf('09140CCC');
-  static final ui.Color panelStroke = colorValueOf('35FF74');
+  static final ui.Color panelStroke = colorValueOf('0038B8');
   static final ui.Color titleColor = colorValueOf('FFFFFF');
-  static final ui.Color textColor = colorValueOf('D8FFE3');
-  static final ui.Color dimTextColor = colorValueOf('76A784');
-  static final ui.Color localPlayerColor = colorValueOf('FFE07A');
+  static final ui.Color textColor = colorValueOf('FFFFFF');
+  static final ui.Color dimTextColor = colorValueOf('9FA4AD');
+  static final ui.Color localPlayerColor = colorValueOf('0038B8');
   static final ui.Color winnerOverlayColor = colorValueOf('000000B8');
 
   final GameApp game;
@@ -56,8 +64,6 @@ class PlayScreen extends ScreenAdapter {
   String _lastSubmittedDirection = 'none';
   String? _trackedPlayerId;
   bool _showDebugOverlay = false;
-  ui.Offset? _localPlayerHighlightCenter;
-  double? _localPlayerHighlightRadius;
 
   PlayScreen(this.game, this.levelIndex) {
     levelData = LevelLoader.loadLevel(levelIndex);
@@ -128,9 +134,10 @@ class PlayScreen extends ScreenAdapter {
         viewport,
       );
     }
-    _renderLocalPlayerHighlight();
+    // _renderLocalPlayerHighlight(); // Círculo del personaje local removido
 
-    _renderLeaderboard(appData);
+    _renderObjective();
+    // _renderLeaderboard(appData); // Leaderboard removida
     if (appData.phase == MatchPhase.finished) {
       _renderWinnerOverlay(appData);
     }
@@ -153,8 +160,6 @@ class PlayScreen extends ScreenAdapter {
     List<MultiplayerPlayer> players,
     String? localPlayerId,
   ) {
-    _localPlayerHighlightCenter = null;
-    _localPlayerHighlightRadius = null;
     final ui.Color previousBatchColor = batch.getColor();
     bool usingRemotePlayerOpacity = false;
     final List<MultiplayerPlayer> orderedPlayers =
@@ -189,20 +194,6 @@ class PlayScreen extends ScreenAdapter {
         height: player.height,
         flipX: frame.flipX,
       );
-      if (isLocalPlayer) {
-        final ui.Rect dst = viewport.worldToScreenRect(
-          player.x,
-          player.y,
-          player.width,
-          player.height,
-        );
-        _localPlayerHighlightCenter = ui.Offset(
-          dst.left + dst.width * frame.anchorX,
-          dst.top + dst.height * frame.anchorY,
-        );
-        _localPlayerHighlightRadius =
-            math.max(dst.width, dst.height) * 0.5 + localPlayerRingPadding;
-      }
     }
     if (usingRemotePlayerOpacity) {
       batch.setColor(previousBatchColor);
@@ -255,96 +246,114 @@ class PlayScreen extends ScreenAdapter {
     batch.drawRegion(texture, src, dst, flipX: flipX);
   }
 
-  void _renderLocalPlayerHighlight() {
-    final ui.Offset? center = _localPlayerHighlightCenter;
-    final double? radius = _localPlayerHighlightRadius;
-    if (center == null || radius == null) {
-      return;
-    }
-    final ShapeRenderer shapes = game.getShapeRenderer();
-    shapes.begin(ShapeType.line);
-    shapes.setColor(localPlayerColor);
-    shapes.circle(center.dx, center.dy, radius, 24);
-    shapes.setColor(colorValueOf('FFE07A88'));
-    shapes.circle(center.dx, center.dy, math.max(4, radius - 3), 24);
-    shapes.end();
-  }
+  // void _renderLocalPlayerHighlight() {
+  //   final ui.Offset? center = _localPlayerHighlightCenter;
+  //   final double? radius = _localPlayerHighlightRadius;
+  //   if (center == null || radius == null) {
+  //     return;
+  //   }
+  //   final ShapeRenderer shapes = game.getShapeRenderer();
+  //   shapes.begin(ShapeType.line);
+  //   shapes.setColor(localPlayerColor);
+  //   shapes.circle(center.dx, center.dy, radius, 24);
+  //   shapes.setColor(colorValueOf('FFE07A88'));
+  //   shapes.circle(center.dx, center.dy, math.max(4, radius - 3), 24);
+  //   shapes.end();
+  // }
 
-  void _renderLeaderboard(AppData appData) {
+  // void _renderLeaderboard(AppData appData) {
+  //   final double screenWidth = Gdx.graphics.getWidth().toDouble();
+  //   final double screenHeight = Gdx.graphics.getHeight().toDouble();
+  //   final ShapeRenderer shapes = game.getShapeRenderer();
+  //   shapes.begin(ShapeType.filled);
+  //   shapes.setColor(panelFill);
+  //   shapes.rect(
+  //     screenWidth - leaderboardWidth,
+  //     0,
+  //     leaderboardWidth,
+  //     screenHeight,
+  //   );
+  //   shapes.end();
+  //
+  //   shapes.begin(ShapeType.line);
+  //   shapes.setColor(panelStroke);
+  //   shapes.rect(
+  //     screenWidth - leaderboardWidth,
+  //     0,
+  //     leaderboardWidth,
+  //     screenHeight,
+  //   );
+  //   shapes.end();
+  //
+  //   final SpriteBatch batch = game.getBatch();
+  //   final BitmapFont font = game.getFont();
+  //   batch.begin();
+  //
+  //   _drawLeftAlignedText(
+  //     batch,
+  //     font,
+  //     'Leaderboard',
+  //     screenWidth - leaderboardWidth + leaderboardPadding,
+  //     34,
+  //     1.45,
+  //     titleColor,
+  //   );
+  //   _drawLeftAlignedText(
+  //     batch,
+  //     font,
+  //     'Remaining gems: ${appData.remainingGems}',
+  //     screenWidth - leaderboardWidth + leaderboardPadding,
+  //     64,
+  //     1.0,
+  //     dimTextColor,
+  //   );
+  //
+  //   PlayerListRenderer.render(
+  //     batch: batch,
+  //     font: font,
+  //     layout: layout,
+  //     players: appData.sortedPlayers,
+  //     localPlayerId: appData.playerId,
+  //     left: screenWidth - leaderboardWidth + leaderboardPadding,
+  //     right: screenWidth - leaderboardPadding,
+  //     startY: leaderboardStartY,
+  //     textColor: textColor,
+  //     localPlayerColor: localPlayerColor,
+  //     drawLeftAlignedText: _drawLeftAlignedText,
+  //     drawRightAlignedText: _drawRightAlignedText,
+  //     style: PlayerListRenderer.gameplayStyle,
+  //   );
+  //
+  //   if (appData.sortedPlayers.isEmpty) {
+  //     _drawLeftAlignedText(
+  //       batch,
+  //       font,
+  //       'Waiting for players...',
+  //       screenWidth - leaderboardWidth + leaderboardPadding,
+  //       leaderboardStartY,
+  //       1.0,
+  //       dimTextColor,
+  //     );
+  //   }
+  //
+  //   batch.end();
+  // }
+
+  /// Renderiza el objetivo del juego en la pantalla
+  void _renderObjective() {
     final double screenWidth = Gdx.graphics.getWidth().toDouble();
-    final double screenHeight = Gdx.graphics.getHeight().toDouble();
-    final ShapeRenderer shapes = game.getShapeRenderer();
-    shapes.begin(ShapeType.filled);
-    shapes.setColor(panelFill);
-    shapes.rect(
-      screenWidth - leaderboardWidth,
-      0,
-      leaderboardWidth,
-      screenHeight,
-    );
-    shapes.end();
-
-    shapes.begin(ShapeType.line);
-    shapes.setColor(panelStroke);
-    shapes.rect(
-      screenWidth - leaderboardWidth,
-      0,
-      leaderboardWidth,
-      screenHeight,
-    );
-    shapes.end();
-
     final SpriteBatch batch = game.getBatch();
     final BitmapFont font = game.getFont();
     batch.begin();
-
     _drawLeftAlignedText(
       batch,
       font,
-      'Leaderboard',
-      screenWidth - leaderboardWidth + leaderboardPadding,
-      34,
-      1.45,
+      'Objectivo: Abrir la puerta',
+      20,
+      screenWidth - 20,
+      1.2,
       titleColor,
     );
-    _drawLeftAlignedText(
-      batch,
-      font,
-      'Remaining gems: ${appData.remainingGems}',
-      screenWidth - leaderboardWidth + leaderboardPadding,
-      64,
-      1.0,
-      dimTextColor,
-    );
-
-    PlayerListRenderer.render(
-      batch: batch,
-      font: font,
-      layout: layout,
-      players: appData.sortedPlayers,
-      localPlayerId: appData.playerId,
-      left: screenWidth - leaderboardWidth + leaderboardPadding,
-      right: screenWidth - leaderboardPadding,
-      startY: leaderboardStartY,
-      textColor: textColor,
-      localPlayerColor: localPlayerColor,
-      drawLeftAlignedText: _drawLeftAlignedText,
-      drawRightAlignedText: _drawRightAlignedText,
-      style: PlayerListRenderer.gameplayStyle,
-    );
-
-    if (appData.sortedPlayers.isEmpty) {
-      _drawLeftAlignedText(
-        batch,
-        font,
-        'Waiting for players...',
-        screenWidth - leaderboardWidth + leaderboardPadding,
-        leaderboardStartY,
-        1.0,
-        dimTextColor,
-      );
-    }
-
     batch.end();
   }
 
@@ -388,6 +397,8 @@ class PlayScreen extends ScreenAdapter {
     batch.end();
   }
 
+  /// Envía la dirección de movimiento al servidor si ha cambiado
+  /// Evita enviar mensajes redundantes cuando la dirección no cambia
   void _submitDirection(AppData appData, String direction) {
     if (_lastSubmittedDirection == direction) {
       return;
@@ -396,6 +407,8 @@ class PlayScreen extends ScreenAdapter {
     appData.updateMovementDirection(direction);
   }
 
+  /// Maneja el input del salto del jugador local
+  /// Se activa al presionar SPACE, UP o W
   void _handleJumpInput(AppData appData) {
     if (Gdx.input.isKeyJustPressed(Input.keys.space) ||
         Gdx.input.isKeyJustPressed(Input.keys.up) ||
@@ -404,6 +417,9 @@ class PlayScreen extends ScreenAdapter {
     }
   }
 
+  /// Lee la entrada del usuario y retorna la dirección de movimiento
+  /// Soporta las flechas del teclado (LEFT/RIGHT) y WASD (A/D)
+  /// Retorna 'left', 'right' o 'none'
   String _readCurrentDirection() {
     final bool left =
         Gdx.input.isKeyPressed(Input.keys.left) ||
@@ -597,65 +613,19 @@ class PlayScreen extends ScreenAdapter {
 
   _AnimatedSpriteFrame _playerFrameFor(MultiplayerPlayer player) {
     final String facing = player.facing;
-    final bool moving = player.moving;
+    final String animationName = _playerSkinAnimationNameFor(player);
     final bool inAir = !player.onGround;
-    final bool isFalling = inAir && player.velocityY > 50;
     bool flipX = false;
-    String animationName;
 
     if (inAir) {
-      final String airFacing = facing == 'left' ? 'Left' : 'Right';
-      if (isFalling) {
-        animationName = 'Character Fall $airFacing';
-      } else {
-        animationName = 'Character Jump $airFacing';
-      }
-      return _frameFromTemplate(
-        playerTemplate,
-        animationName: animationName,
-      );
+      return _frameFromTemplate(playerTemplate, animationName: animationName);
     }
 
     switch (facing) {
       case 'left':
-        animationName = moving
-            ? 'Character  Walk Right'
-            : 'Character Idle Right';
         flipX = true;
         break;
-      case 'upLeft':
-        animationName = moving
-            ? 'Character  Walk Up-Right'
-            : 'Character Idle Up-Right';
-        flipX = true;
-        break;
-      case 'downLeft':
-        animationName = moving
-            ? 'Character  Walk Down-Right'
-            : 'Character Idle Down-Right';
-        flipX = true;
-        break;
-      case 'right':
-        animationName = moving
-            ? 'Character  Walk Right'
-            : 'Character Idle Right';
-        break;
-      case 'upRight':
-        animationName = moving
-            ? 'Character  Walk Up-Right'
-            : 'Character Idle Up-Right';
-        break;
-      case 'up':
-        animationName = moving ? 'Character  Walk Up' : 'Character Idle Up';
-        break;
-      case 'downRight':
-        animationName = moving
-            ? 'Character  Walk Down-Right'
-            : 'Character Idle Down-Right';
-        break;
-      case 'down':
       default:
-        animationName = moving ? 'Character  Walk Down' : 'Character Idle Down';
         break;
     }
 
@@ -664,6 +634,18 @@ class PlayScreen extends ScreenAdapter {
       animationName: animationName,
       flipX: flipX,
     );
+  }
+
+  String _playerSkinAnimationNameFor(MultiplayerPlayer player) {
+    if (_playerSkinAnimations.isEmpty) {
+      return playerTemplate.animationId ?? '';
+    }
+
+    final int seed = player.joinOrder >= 0
+        ? player.joinOrder
+        : player.id.hashCode;
+    final int index = seed.abs() % _playerSkinAnimations.length;
+    return _playerSkinAnimations[index];
   }
 
   _AnimatedSpriteFrame _frameFromTemplate(
@@ -788,21 +770,21 @@ class PlayScreen extends ScreenAdapter {
     font.getData().setScale(1);
   }
 
-  void _drawRightAlignedText(
-    SpriteBatch batch,
-    BitmapFont font,
-    String text,
-    double right,
-    double y,
-    double scale,
-    ui.Color color,
-  ) {
-    font.getData().setScale(scale);
-    font.setColor(color);
-    layout.setText(font, text);
-    font.draw(batch, layout, right - layout.width, y);
-    font.getData().setScale(1);
-  }
+  // void _drawRightAlignedText(
+  //   SpriteBatch batch,
+  //   BitmapFont font,
+  //   String text,
+  //   double right,
+  //   double y,
+  //   double scale,
+  //   ui.Color color,
+  // ) {
+  //   font.getData().setScale(scale);
+  //   font.setColor(color);
+  //   layout.setText(font, text);
+  //   font.draw(batch, layout, right - layout.width, y);
+  //   font.getData().setScale(1);
+  // }
 }
 
 class _AnimatedSpriteFrame {

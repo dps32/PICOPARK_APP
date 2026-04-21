@@ -89,6 +89,8 @@ class Input {
 
   int getY() => _state.getY();
 
+  bool isTouchDown() => _state.isTouchDown();
+
   void endFrame() {
     _state.endFrame();
   }
