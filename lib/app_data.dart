@@ -20,6 +20,8 @@ class MultiplayerPlayer {
   final String direction;
   final String facing;
   final bool moving;
+  final double velocityY;
+  final bool onGround;
   final int joinOrder;
 
   const MultiplayerPlayer({
@@ -34,6 +36,8 @@ class MultiplayerPlayer {
     required this.direction,
     required this.facing,
     required this.moving,
+    required this.velocityY,
+    required this.onGround,
     required this.joinOrder,
   });
 
@@ -50,6 +54,8 @@ class MultiplayerPlayer {
       direction: (json['direction'] as String? ?? 'none').trim(),
       facing: (json['facing'] as String? ?? 'down').trim(),
       moving: json['moving'] as bool? ?? false,
+      velocityY: (json['velocityY'] as num? ?? 0).toDouble(),
+      onGround: json['onGround'] as bool? ?? true,
       joinOrder: (json['joinOrder'] as num? ?? 0).toInt(),
     );
   }
@@ -132,6 +138,8 @@ class _PlayerDynamicData {
   final String direction;
   final String facing;
   final bool moving;
+  final double velocityY;
+  final bool onGround;
 
   const _PlayerDynamicData({
     required this.id,
@@ -142,6 +150,8 @@ class _PlayerDynamicData {
     required this.direction,
     required this.facing,
     required this.moving,
+    required this.velocityY,
+    required this.onGround,
   });
 }
 
@@ -153,7 +163,7 @@ class _LocalBotProfile {
 }
 
 class AppData extends ChangeNotifier {
-  static const int _minimumPlayersRequired = 3;
+  static const int _minimumPlayersRequired = 2;
 
   final WebSocketsHandler _wsHandler = WebSocketsHandler();
   final int _maxReconnectAttempts = 5;
@@ -243,21 +253,16 @@ class AppData extends ChangeNotifier {
   bool get canRequestMatchStart =>
       isConnected &&
       phase == MatchPhase.waiting &&
-      isRoomHost &&
       players.length >= minPlayers;
 
   bool get canRequestMatchRestart =>
       isConnected && phase == MatchPhase.finished;
 
   String get roomLabel {
-    final String normalized = (roomCode ?? '').trim();
-    if (normalized.isEmpty) {
-      return 'CREATING...';
-    }
-    return normalized;
+    return 'GLOBAL';
   }
 
-  bool get _shouldUseLocalBots => networkConfig.serverOption == ServerOption.local;
+  bool get _shouldUseLocalBots => false;
 
   void updateNetworkConfig(NetworkConfig nextConfig) {
     networkConfig = nextConfig;
@@ -314,7 +319,6 @@ class AppData extends ChangeNotifier {
       print('[REMOTE MODE] Enviant startMatch al servidor');
     }
     _sendMessage(<String, dynamic>{'type': 'startMatch'});
-    _sendMessage(<String, dynamic>{'type': 'room:start'});
   }
 
   void disconnect() {
@@ -423,6 +427,8 @@ class AppData extends ChangeNotifier {
       direction: 'none',
       facing: 'down',
       moving: false,
+      velocityY: 0,
+      onGround: true,
       joinOrder: 0,
     );
     
@@ -446,6 +452,8 @@ class AppData extends ChangeNotifier {
         direction: 'none',
         facing: 'down',
         moving: false,
+        velocityY: 0,
+        onGround: true,
       ),
     };
     
@@ -643,6 +651,8 @@ class AppData extends ChangeNotifier {
         direction: (player['direction'] as String? ?? 'none').trim(),
         facing: (player['facing'] as String? ?? 'down').trim(),
         moving: player['moving'] as bool? ?? false,
+        velocityY: (player['velocityY'] as num? ?? 0).toDouble(),
+        onGround: player['onGround'] as bool? ?? true,
       );
       joinOrder++;
     }
@@ -774,6 +784,8 @@ class AppData extends ChangeNotifier {
       direction: (json['direction'] as String? ?? 'none').trim(),
       facing: (json['facing'] as String? ?? 'down').trim(),
       moving: json['moving'] as bool? ?? false,
+      velocityY: (json['velocityY'] as num? ?? 0).toDouble(),
+      onGround: json['onGround'] as bool? ?? true,
     );
   }
 
@@ -797,6 +809,8 @@ class AppData extends ChangeNotifier {
         direction: dynamicData?.direction ?? 'none',
         facing: dynamicData?.facing ?? 'down',
         moving: dynamicData?.moving ?? false,
+        velocityY: dynamicData?.velocityY ?? 0,
+        onGround: dynamicData?.onGround ?? true,
         joinOrder: staticData?.joinOrder ?? 0,
       );
     }).toList(growable: false);
@@ -863,6 +877,8 @@ class AppData extends ChangeNotifier {
           direction: 'none',
           facing: 'down',
           moving: false,
+          velocityY: 0,
+          onGround: true,
           joinOrder: 1000 + joinOrder,
         ),
       );
@@ -895,30 +911,7 @@ class AppData extends ChangeNotifier {
     final String safeName = playerName.trim().isEmpty
         ? 'Player'
         : playerName.trim();
-    final String desiredRoomCode = networkConfig.roomCode.trim().toUpperCase();
-
-    if (desiredRoomCode.isEmpty) {
-      _sendMessage(<String, dynamic>{
-        'type': 'createRoom',
-        'nickname': safeName,
-      });
-      _sendMessage(<String, dynamic>{
-        'type': 'room:create',
-        'nickname': safeName,
-      });
-    } else {
-      roomCode = desiredRoomCode;
-      _sendMessage(<String, dynamic>{
-        'type': 'joinRoom',
-        'roomCode': desiredRoomCode,
-        'nickname': safeName,
-      });
-      _sendMessage(<String, dynamic>{
-        'type': 'room:join',
-        'roomCode': desiredRoomCode,
-        'nickname': safeName,
-      });
-    }
+    roomCode = 'GLOBAL';
 
     _sendMessage(<String, dynamic>{
       'type': 'register',

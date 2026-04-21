@@ -183,8 +183,8 @@ class _ConfigurationScreenState extends State<_ConfigurationScreen> {
                   TextField(
                     controller: _roomCodeController,
                     decoration: const InputDecoration(
-                      labelText: 'Room code (optional)',
-                      helperText: 'Empty = create room, filled = join room',
+                      labelText: 'Room code (ignored)',
+                      helperText: 'This build uses a single global room for all players.',
                       border: OutlineInputBorder(),
                     ),
                     textCapitalization: TextCapitalization.characters,

@@ -9,6 +9,7 @@ import 'libgdx_compat/gdx.dart';
 import 'libgdx_compat/gdx_collections.dart';
 import 'loading_screen.dart';
 import 'network_config.dart';
+import 'level_loader.dart';
 
 class GameApp extends Game {
   static const int multiplayerLevelIndex = 0;
@@ -119,11 +120,7 @@ class GameApp extends Game {
     _animationMediaEntries.clear();
 
     try {
-      final String gameDataRaw = await rootBundle.loadString(
-        'assets/levels/game_data.json',
-      );
-      final Map<String, dynamic> root =
-          jsonDecode(gameDataRaw) as Map<String, dynamic>;
+      final Map<String, dynamic> root = await LevelLoader.loadGameDataRoot();
       final List<dynamic>? levels = root['levels'] as List<dynamic>?;
       if (levels == null || levels.isEmpty) {
         _addFallbackLevels();
@@ -167,9 +164,12 @@ class GameApp extends Game {
     }
 
     try {
-      final String raw = await rootBundle.loadString(
+      final String? raw = await LevelLoader.loadAssetString(
         'assets/levels/$animationsFilePath',
       );
+      if (raw == null) {
+        return;
+      }
       final Map<String, dynamic> animationsRoot =
           jsonDecode(raw) as Map<String, dynamic>;
       final List<dynamic>? animations =

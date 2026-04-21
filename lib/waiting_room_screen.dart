@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'app_data.dart';
@@ -10,30 +9,33 @@ import 'libgdx_compat/viewport.dart';
 import 'level_data.dart';
 import 'level_loader.dart';
 import 'play_screen.dart';
-import 'player_list_renderer.dart';
 
 class WaitingRoomScreen extends ScreenAdapter {
   static const double worldWidth = 1280;
   static const double worldHeight = 720;
-  static const double panelWidth = 320;
-  static const double panelPadding = 14;
-  static const double leaderboardStartY = 92;
-  static const double playButtonWidth = 250;
-  static const double playButtonHeight = 64;
+  static const double cardWidth = 760;
+  static const double cardHeight = 560;
+  static const double listInset = 48;
+  static const double listTop = 250;
+  static const double listRowHeight = 42;
+  static const double playButtonWidth = 280;
+  static const double playButtonHeight = 68;
 
-  static final ui.Color background = colorValueOf('070E08');
-  static final ui.Color panelFill = colorValueOf('09140CCC');
-  static final ui.Color panelStroke = colorValueOf('35FF74');
-  static final ui.Color titleColor = colorValueOf('FFFFFF');
-  static final ui.Color textColor = colorValueOf('D8FFE3');
-  static final ui.Color dimTextColor = colorValueOf('76A784');
-  static final ui.Color highlightColor = colorValueOf('35FF74');
-  static final ui.Color localPlayerColor = colorValueOf('FFE07A');
-  static final ui.Color playButtonFill = colorValueOf('0E1E12');
-  static final ui.Color playButtonDisabledFill = colorValueOf('0A130C');
-  static final ui.Color playButtonStroke = colorValueOf('35FF74');
-  static final ui.Color playButtonDisabledStroke = colorValueOf('315A40');
-  static final ui.Color errorColor = colorValueOf('FF7A7A');
+  static final ui.Color background = colorValueOf('F6F8FB');
+  static final ui.Color cardFill = colorValueOf('FFFFFF');
+  static final ui.Color cardStroke = colorValueOf('D7DEE8');
+  static final ui.Color titleColor = colorValueOf('162033');
+  static final ui.Color textColor = colorValueOf('314058');
+  static final ui.Color dimTextColor = colorValueOf('6D7C93');
+  static final ui.Color accentColor = colorValueOf('2D7DFF');
+  static final ui.Color localPlayerColor = colorValueOf('0D58D8');
+  static final ui.Color listFill = colorValueOf('F9FBFF');
+  static final ui.Color listStroke = colorValueOf('DCE6F5');
+  static final ui.Color playButtonFill = colorValueOf('2D7DFF');
+  static final ui.Color playButtonDisabledFill = colorValueOf('B6C4D8');
+  static final ui.Color playButtonStroke = colorValueOf('1F63CF');
+  static final ui.Color playButtonDisabledStroke = colorValueOf('AAB8CA');
+  static final ui.Color errorColor = colorValueOf('C44545');
 
   final GameApp game;
   final int levelIndex;
@@ -67,15 +69,26 @@ class WaitingRoomScreen extends ScreenAdapter {
     ScreenUtils.clear(background);
     viewport.apply();
 
+    final double cardX = (worldWidth - cardWidth) * 0.5;
+    final double cardY = (worldHeight - cardHeight) * 0.5;
+    final double listX = cardX + listInset;
+    final double listY = cardY + listTop;
+    final double listWidth = cardWidth - listInset * 2;
+    final double listHeight = 190;
+
     final ShapeRenderer shapes = game.getShapeRenderer();
     shapes.begin(ShapeType.filled);
-    shapes.setColor(panelFill);
-    shapes.rect(worldWidth - panelWidth, 0, panelWidth, worldHeight);
+    shapes.setColor(cardFill);
+    shapes.rect(cardX, cardY, cardWidth, cardHeight);
+    shapes.setColor(listFill);
+    shapes.rect(listX, listY, listWidth, listHeight);
     shapes.end();
 
     shapes.begin(ShapeType.line);
-    shapes.setColor(panelStroke);
-    shapes.rect(worldWidth - panelWidth, 0, panelWidth, worldHeight);
+    shapes.setColor(cardStroke);
+    shapes.rect(cardX, cardY, cardWidth, cardHeight);
+    shapes.setColor(listStroke);
+    shapes.rect(listX, listY, listWidth, listHeight);
     shapes.end();
 
     final bool canStart = appData.canRequestMatchStart;
@@ -103,60 +116,84 @@ class WaitingRoomScreen extends ScreenAdapter {
     final BitmapFont font = game.getFont();
     batch.begin();
 
+    _drawCenteredText(batch, font, 'Waiting Room', cardY + 72, 2.6, titleColor);
     _drawCenteredText(
       batch,
       font,
-      'Waiting Room',
-      worldHeight * 0.18,
-      2.8,
-      titleColor,
-    );
-    _drawCenteredText(
-      batch,
-      font,
-      'Room ${appData.roomLabel}  ${appData.sortedPlayers.length}/${appData.maxPlayers}',
-      worldHeight * 0.32,
-      1.35,
+      'Room ${appData.roomLabel}',
+      cardY + 110,
+      1.2,
       dimTextColor,
     );
 
-    final bool usingCountdown = appData.countdownSeconds > 0;
+    final String playersCounter =
+        '${appData.sortedPlayers.length}/${appData.maxPlayers} players';
     _drawCenteredText(
       batch,
       font,
-      usingCountdown
-          ? '${math.max(0, appData.countdownSeconds)}'
-          : (appData.isRoomHost ? 'Press PLAY' : 'Waiting host'),
-      worldHeight * 0.48,
-      usingCountdown ? 5.5 : 2.5,
-      highlightColor,
+      playersCounter,
+      cardY + 156,
+      1.7,
+      accentColor,
     );
 
     _drawCenteredText(
       batch,
       font,
-      'Work together to complete the puzzle.',
-      worldHeight * 0.62,
-      1.55,
-      textColor,
+      'Players in room',
+      listY - 18,
+      1.15,
+      dimTextColor,
     );
+
+    final List<MultiplayerPlayer> players = appData.sortedPlayers;
+    if (players.isEmpty) {
+      _drawCenteredText(
+        batch,
+        font,
+        'No players connected yet',
+        listY + 108,
+        1.2,
+        dimTextColor,
+      );
+    } else {
+      double rowY = listY + 44;
+      for (int i = 0; i < players.length; i++) {
+        final MultiplayerPlayer player = players[i];
+        final bool isLocalPlayer = player.id == appData.playerId;
+        final String label = '${i + 1}. ${player.name}';
+        _drawLeftAlignedText(
+          batch,
+          font,
+          label,
+          listX + 20,
+          rowY,
+          1.2,
+          isLocalPlayer ? localPlayerColor : textColor,
+        );
+        rowY += listRowHeight;
+        if (rowY > listY + listHeight - 12) {
+          break;
+        }
+      }
+    }
 
     _drawCenteredText(
       batch,
       font,
-      canStart ? 'PLAY (ENTER)' : 'PLAY',
-      playButtonBounds.y + playButtonBounds.height * 0.68,
-      1.8,
-      canStart ? highlightColor : dimTextColor,
+      canStart ? 'Play (Enter)' : 'Play',
+      playButtonBounds.y + playButtonBounds.height * 0.67,
+      1.75,
+      colorValueOf('FFFFFF'),
     );
 
     if (appData.sortedPlayers.length < appData.minPlayers) {
       _drawCenteredText(
         batch,
         font,
-        'Need at least ${appData.minPlayers} players to start',
-        playButtonBounds.y + playButtonBounds.height + 34,
-        1.05,
+        'Need at least ${appData.minPlayers} players',
+        playButtonBounds.y - 18,
+        1.0,
         dimTextColor,
       );
     }
@@ -167,56 +204,9 @@ class WaitingRoomScreen extends ScreenAdapter {
         batch,
         font,
         roomError,
-        playButtonBounds.y + playButtonBounds.height + 62,
+        playButtonBounds.y - 42,
         0.95,
         errorColor,
-      );
-    }
-
-    _drawLeftAlignedText(
-      batch,
-      font,
-      'Players',
-      worldWidth - panelWidth + panelPadding,
-      34,
-      1.45,
-      titleColor,
-    );
-    _drawLeftAlignedText(
-      batch,
-      font,
-      'Ready to start',
-      worldWidth - panelWidth + panelPadding,
-      64,
-      1.0,
-      dimTextColor,
-    );
-
-    PlayerListRenderer.render(
-      batch: batch,
-      font: font,
-      layout: layout,
-      players: appData.sortedPlayers,
-      localPlayerId: appData.playerId,
-      left: worldWidth - panelWidth + panelPadding,
-      right: worldWidth - panelPadding,
-      startY: leaderboardStartY,
-      textColor: textColor,
-      localPlayerColor: localPlayerColor,
-      drawLeftAlignedText: _drawLeftAlignedText,
-      drawRightAlignedText: _drawRightAlignedText,
-      style: PlayerListRenderer.gameplayStyle,
-    );
-
-    if (appData.sortedPlayers.isEmpty) {
-      _drawLeftAlignedText(
-        batch,
-        font,
-        'Waiting for players...',
-        worldWidth - panelWidth + panelPadding,
-        leaderboardStartY,
-        1.0,
-        dimTextColor,
       );
     }
 
@@ -234,14 +224,14 @@ class WaitingRoomScreen extends ScreenAdapter {
     font.getData().setScale(scale);
     font.setColor(color);
     layout.setText(font, text);
-    final double x = (worldWidth - panelWidth - layout.width) * 0.5;
+    final double x = (worldWidth - layout.width) * 0.5;
     font.draw(batch, layout, x, y);
     font.getData().setScale(1);
   }
 
   void _updatePlayButtonBounds() {
-    final double x = (worldWidth - panelWidth) * 0.5 - playButtonWidth * 0.5;
-    final double y = worldHeight * 0.78;
+    final double x = worldWidth * 0.5 - playButtonWidth * 0.5;
+    final double y = worldHeight * 0.5 + 180;
     playButtonBounds.set(x, y, playButtonWidth, playButtonHeight);
   }
 
@@ -260,11 +250,9 @@ class WaitingRoomScreen extends ScreenAdapter {
       return;
     }
 
-    viewport.unproject(pointer.set(
-      Gdx.input.getX().toDouble(),
-      Gdx.input.getY().toDouble(),
-      0,
-    ));
+    viewport.unproject(
+      pointer.set(Gdx.input.getX().toDouble(), Gdx.input.getY().toDouble(), 0),
+    );
 
     if (playButtonBounds.contains(pointer.x, pointer.y)) {
       appData.requestMatchStart();
@@ -283,22 +271,6 @@ class WaitingRoomScreen extends ScreenAdapter {
     font.getData().setScale(scale);
     font.setColor(color);
     font.drawText(text, x, y);
-    font.getData().setScale(1);
-  }
-
-  void _drawRightAlignedText(
-    SpriteBatch batch,
-    BitmapFont font,
-    String text,
-    double right,
-    double y,
-    double scale,
-    ui.Color color,
-  ) {
-    font.getData().setScale(scale);
-    font.setColor(color);
-    layout.setText(font, text);
-    font.draw(batch, layout, right - layout.width, y);
     font.getData().setScale(1);
   }
 

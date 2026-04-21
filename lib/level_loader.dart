@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -20,10 +21,7 @@ class LevelLoader {
   static final Map<String, dynamic> _jsonByPath = <String, dynamic>{};
 
   static Future<void> initialize() async {
-    final String gameDataRaw = await rootBundle.loadString(
-      'assets/$gameDataPath',
-    );
-    _gameDataRoot = jsonDecode(gameDataRaw) as Map<String, dynamic>;
+    _gameDataRoot = await loadGameDataRoot();
     _jsonByPath[gameDataPath] = _gameDataRoot!;
 
     final String? animationsFilePath =
@@ -31,9 +29,13 @@ class LevelLoader {
     if (animationsFilePath != null && animationsFilePath.isNotEmpty) {
       try {
         final String fullAnimationsPath = 'levels/$animationsFilePath';
-        final String animationsRaw = await rootBundle.loadString(
+        final String? animationsRaw = await loadAssetString(
           'assets/$fullAnimationsPath',
         );
+        if (animationsRaw == null) {
+          _animationsRoot = null;
+          return;
+        }
         _animationsRoot = jsonDecode(animationsRaw) as Map<String, dynamic>;
         _jsonByPath[fullAnimationsPath] = _animationsRoot!;
       } catch (_) {
@@ -770,11 +772,185 @@ class LevelLoader {
       return;
     }
     try {
-      final String raw = await rootBundle.loadString('assets/$path');
+      final String? raw = await loadAssetString('assets/$path');
+      if (raw == null) {
+        return;
+      }
       _jsonByPath[path] = jsonDecode(raw);
     } catch (ex) {
       Gdx.app.error('LevelLoader', 'Failed to preload $path', ex);
     }
+  }
+
+  static Future<Map<String, dynamic>> loadGameDataRoot() async {
+    final String? raw = await loadAssetString('assets/$gameDataPath');
+    if (raw != null) {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    }
+    return _fallbackGameDataRoot();
+  }
+
+  static Future<String?> loadAssetString(String assetPath) async {
+    const int maxAttempts = 4;
+    Object? lastError;
+
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final String raw = await rootBundle.loadString(assetPath);
+        if (raw.trim().isNotEmpty) {
+          return raw;
+        }
+        lastError = 'Asset is empty: $assetPath';
+      } catch (error) {
+        lastError = error;
+        if (attempt >= maxAttempts - 1) {
+          return null;
+        }
+        await Future<void>.delayed(
+          Duration(milliseconds: 80 * (attempt + 1)),
+        );
+      }
+    }
+
+    Gdx.app.error(
+      'LevelLoader',
+      'Unable to load asset after retries: $assetPath',
+      lastError,
+    );
+    return null;
+  }
+
+  static Map<String, dynamic> _fallbackGameDataRoot() {
+    return <String, dynamic>{
+      'name': 'Multiplayer game',
+      'description': '',
+      'levels': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'name': 'All together now',
+          'description': '',
+          'gameplayData': '',
+          'layers': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'name': 'Terrain',
+              'gameplayData': '',
+              'x': 0,
+              'y': 0,
+              'depth': 0.0,
+              'tilesSheetFile': 'media/Proyecto nuevo.png',
+              'tilesWidth': 50,
+              'tilesHeight': 50,
+              'visible': true,
+              'groupId': '__main__',
+              'tileMapFile': 'tilemaps/level_000_layer_000.json',
+            }
+          ],
+          'layerGroups': <Map<String, dynamic>>[
+            <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+          ],
+          'sprites': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'name': 'Hero 0',
+              'gameplayData': '',
+              'type': 'Hero 0',
+              'animationId': 'anim_1772099194341380',
+              'x': 32,
+              'y': 32,
+              'width': 20,
+              'height': 20,
+              'imageFile': 'media/16x16 Idle-Sheet.png',
+              'flipX': false,
+              'flipY': false,
+              'depth': 0.0,
+              'groupId': '__main__',
+            }
+          ],
+          'spriteGroups': <Map<String, dynamic>>[
+            <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+          ],
+          'groupId': '__main__',
+          'viewportWidth': 560,
+          'viewportHeight': 250,
+          'viewportX': 50,
+          'viewportY': 130,
+          'viewportAdaptation': 'expand',
+          'viewportInitialColor': 'yellow',
+          'viewportPreviewColor': 'pink',
+          'backgroundColorHex': '#000000',
+          'depthSensitivity': 0.08,
+          'zonesFile': 'zones/level_000_zones.json',
+          'pathsFile': 'paths/level_000_paths.json',
+        }
+      ],
+      'levelGroups': <Map<String, dynamic>>[
+        <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+      ],
+      'mediaAssets': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'name': 'Tileset',
+          'fileName': 'media/punyworld-overworld-tileset.png',
+          'mediaType': 'tileset',
+          'tileWidth': 16,
+          'tileHeight': 16,
+          'selectionColorHex': '#FF2D55',
+          'groupId': '__main__',
+        },
+        <String, dynamic>{
+          'name': 'sandia_suelo',
+          'fileName': 'media/Proyecto nuevo.png',
+          'mediaType': 'tileset',
+          'tileWidth': 50,
+          'tileHeight': 50,
+          'selectionColorHex': '#FFCC00',
+          'groupId': '__main__',
+        },
+        <String, dynamic>{
+          'name': 'Character Idle',
+          'fileName': 'media/16x16 Idle-Sheet.png',
+          'mediaType': 'spritesheet',
+          'tileWidth': 20,
+          'tileHeight': 20,
+          'selectionColorHex': '#FFCC00',
+          'groupId': '__main__',
+        },
+        <String, dynamic>{
+          'name': 'Character Walk',
+          'fileName': 'media/16x16 Walk-Sheet.png',
+          'mediaType': 'spritesheet',
+          'tileWidth': 20,
+          'tileHeight': 20,
+          'selectionColorHex': '#FFCC00',
+          'groupId': '__main__',
+        },
+        <String, dynamic>{
+          'name': 'Smoke',
+          'fileName': 'media/DragonDeath.png',
+          'mediaType': 'spritesheet',
+          'tileWidth': 28,
+          'tileHeight': 26,
+          'selectionColorHex': '#FFCC00',
+          'groupId': '__main__',
+        },
+        <String, dynamic>{
+          'name': 'Gem',
+          'fileName': 'media/gem.png',
+          'mediaType': 'spritesheet',
+          'tileWidth': 15,
+          'tileHeight': 15,
+          'selectionColorHex': '#FFCC00',
+          'groupId': '__main__',
+        },
+      ],
+      'mediaGroups': <Map<String, dynamic>>[
+        <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+      ],
+      'zoneTypes': <Map<String, dynamic>>[
+        <String, dynamic>{'name': 'ground', 'color': 'red'},
+      ],
+      'animationsFile': 'animations/animations.json',
+    };
   }
 }
 

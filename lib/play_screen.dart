@@ -25,6 +25,8 @@ class PlayScreen extends ScreenAdapter {
   static const double maxFrameSeconds = 0.25;
   static const double remotePlayerOpacity = 0.5;
   static const double localPlayerRingPadding = 6;
+  static const double cameraDeadZoneX = 3.0;
+  static const double cameraFollowLerp = 0.18;
 
   static final ui.Color panelFill = colorValueOf('09140CCC');
   static final ui.Color panelStroke = colorValueOf('35FF74');
@@ -52,6 +54,7 @@ class PlayScreen extends ScreenAdapter {
 
   double elapsedSeconds = 0;
   String _lastSubmittedDirection = 'none';
+  String? _trackedPlayerId;
   bool _showDebugOverlay = false;
   ui.Offset? _localPlayerHighlightCenter;
   double? _localPlayerHighlightRadius;
@@ -95,7 +98,7 @@ class PlayScreen extends ScreenAdapter {
     _handleJumpInput(appData);
     _applyServerLayerTransforms(appData.layerTransforms);
     _applyServerZoneTransforms(appData.zoneTransforms);
-    _updateCameraForGameplay(appData.localPlayer);
+    _updateCameraForGameplay(appData);
 
     viewport.apply();
     ScreenUtils.clear(levelData.backgroundColor);
@@ -136,7 +139,7 @@ class PlayScreen extends ScreenAdapter {
   @override
   void resize(int width, int height) {
     viewport.update(width.toDouble(), height.toDouble(), false);
-    _updateCameraForGameplay(game.getAppData().localPlayer);
+    _updateCameraForGameplay(game.getAppData());
   }
 
   @override
@@ -394,7 +397,9 @@ class PlayScreen extends ScreenAdapter {
   }
 
   void _handleJumpInput(AppData appData) {
-    if (Gdx.input.isKeyJustPressed(Input.keys.space)) {
+    if (Gdx.input.isKeyJustPressed(Input.keys.space) ||
+        Gdx.input.isKeyJustPressed(Input.keys.up) ||
+        Gdx.input.isKeyJustPressed(Input.keys.w)) {
       appData.requestJump();
     }
   }
@@ -423,7 +428,23 @@ class PlayScreen extends ScreenAdapter {
     camera.update();
   }
 
-  void _updateCameraForGameplay(MultiplayerPlayer? player) {
+  void _updateCameraForGameplay(AppData appData) {
+    final String? currentPlayerId = appData.playerId;
+    if (currentPlayerId != null && currentPlayerId.isNotEmpty) {
+      _trackedPlayerId = currentPlayerId;
+    }
+
+    MultiplayerPlayer? player = appData.localPlayer;
+    final String? trackedId = _trackedPlayerId;
+    if (trackedId != null && trackedId.isNotEmpty) {
+      for (final MultiplayerPlayer candidate in appData.sortedPlayers) {
+        if (candidate.id == trackedId) {
+          player = candidate;
+          break;
+        }
+      }
+    }
+
     if (player == null) {
       camera.update();
       return;
@@ -432,25 +453,24 @@ class PlayScreen extends ScreenAdapter {
     final double worldW = math.max(1, levelData.worldWidth);
     final double worldH = math.max(1, levelData.worldHeight);
     final double viewW = math.max(1, viewport.worldWidth);
-    final double viewH = math.max(1, viewport.worldHeight);
     final double halfW = viewW * 0.5;
-    final double halfH = viewH * 0.5;
+    final double minX = halfW;
+    final double maxX = math.max(halfW, worldW - halfW);
 
-    final double targetX = clampDouble(
+    final double desiredX = clampDouble(
       player.x + player.width * 0.5,
-      halfW,
-      worldW - halfW,
+      minX,
+      maxX,
     );
-    
-    // Vista de plataforma 2D: La cámara sigue al jugador en Y, 
-    // posicionada más abajo (35% arriba del jugador)
-    final double targetY = clampDouble(
-      player.y + player.height * 0.5 - (viewH * 0.35),
-      halfH,
-      worldH - halfH,
-    );
+    final double targetY = worldH * 0.5;
 
-    camera.setPosition(targetX, targetY);
+    double nextX = camera.x;
+    if ((desiredX - nextX).abs() > cameraDeadZoneX) {
+      nextX = nextX + (desiredX - nextX) * cameraFollowLerp;
+    }
+    nextX = clampDouble(nextX, minX, maxX);
+
+    camera.setPosition(nextX, targetY);
     camera.update();
   }
 
@@ -578,8 +598,23 @@ class PlayScreen extends ScreenAdapter {
   _AnimatedSpriteFrame _playerFrameFor(MultiplayerPlayer player) {
     final String facing = player.facing;
     final bool moving = player.moving;
+    final bool inAir = !player.onGround;
+    final bool isFalling = inAir && player.velocityY > 50;
     bool flipX = false;
     String animationName;
+
+    if (inAir) {
+      final String airFacing = facing == 'left' ? 'Left' : 'Right';
+      if (isFalling) {
+        animationName = 'Character Fall $airFacing';
+      } else {
+        animationName = 'Character Jump $airFacing';
+      }
+      return _frameFromTemplate(
+        playerTemplate,
+        animationName: animationName,
+      );
+    }
 
     switch (facing) {
       case 'left':
