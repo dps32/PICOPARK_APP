@@ -22,7 +22,7 @@ class PlayScreen extends ScreenAdapter {
   static const double leaderboardRowHeight = 24;
   static const double leaderboardStartY = 92;
   static const double maxFrameSeconds = 0.25;
-  static const double remotePlayerOpacity = 0.5;
+  static const double remotePlayerOpacity = 1.0;
   static const double localPlayerRingPadding = 6;
   static const List<String> _playerSkinAnimations = <String>[
     'netanzana',
@@ -33,8 +33,6 @@ class PlayScreen extends ScreenAdapter {
     'netanimon',
     'netaniña',
   ];
-  static const double cameraDeadZoneX = 3.0;
-  static const double cameraFollowLerp = 0.18;
 
   static final ui.Color panelFill = colorValueOf('09140CCC');
   static final ui.Color panelStroke = colorValueOf('0038B8');
@@ -43,6 +41,7 @@ class PlayScreen extends ScreenAdapter {
   static final ui.Color dimTextColor = colorValueOf('9FA4AD');
   static final ui.Color localPlayerColor = colorValueOf('0038B8');
   static final ui.Color winnerOverlayColor = colorValueOf('000000B8');
+  static const String fallbackBackgroundTexture = 'levels/media/background_2.png';
 
   final GameApp game;
   final int levelIndex;
@@ -62,7 +61,6 @@ class PlayScreen extends ScreenAdapter {
 
   double elapsedSeconds = 0;
   String _lastSubmittedDirection = 'none';
-  String? _trackedPlayerId;
   bool _showDebugOverlay = false;
 
   PlayScreen(this.game, this.levelIndex) {
@@ -111,6 +109,7 @@ class PlayScreen extends ScreenAdapter {
 
     final SpriteBatch batch = game.getBatch();
     batch.begin();
+    _renderBackground(batch);
     levelRenderer.render(
       levelData,
       game.getAssetManager(),
@@ -202,8 +201,11 @@ class PlayScreen extends ScreenAdapter {
 
   void _renderGems(SpriteBatch batch, List<MultiplayerGem> gems) {
     for (final MultiplayerGem gem in gems) {
-      final LevelSprite template =
-          gemTemplateByType[gem.type] ?? gemTemplateByType['green']!;
+      final LevelSprite? template =
+          gemTemplateByType[gem.type] ?? gemTemplateByType['green'];
+      if (template == null) {
+        continue;
+      }
       final _AnimatedSpriteFrame frame = _frameFromTemplate(template);
       _drawAnimatedSprite(
         batch,
@@ -445,27 +447,6 @@ class PlayScreen extends ScreenAdapter {
   }
 
   void _updateCameraForGameplay(AppData appData) {
-    final String? currentPlayerId = appData.playerId;
-    if (currentPlayerId != null && currentPlayerId.isNotEmpty) {
-      _trackedPlayerId = currentPlayerId;
-    }
-
-    MultiplayerPlayer? player = appData.localPlayer;
-    final String? trackedId = _trackedPlayerId;
-    if (trackedId != null && trackedId.isNotEmpty) {
-      for (final MultiplayerPlayer candidate in appData.sortedPlayers) {
-        if (candidate.id == trackedId) {
-          player = candidate;
-          break;
-        }
-      }
-    }
-
-    if (player == null) {
-      camera.update();
-      return;
-    }
-
     final double worldW = math.max(1, levelData.worldWidth);
     final double worldH = math.max(1, levelData.worldHeight);
     final double viewW = math.max(1, viewport.worldWidth);
@@ -473,20 +454,19 @@ class PlayScreen extends ScreenAdapter {
     final double minX = halfW;
     final double maxX = math.max(halfW, worldW - halfW);
 
-    final double desiredX = clampDouble(
-      player.x + player.width * 0.5,
-      minX,
-      maxX,
-    );
+    final List<MultiplayerPlayer> players = appData.sortedPlayers;
+    double desiredX = worldW * 0.5;
+    if (players.isNotEmpty) {
+      double sumCenterX = 0;
+      for (final MultiplayerPlayer player in players) {
+        sumCenterX += player.x + player.width * 0.5;
+      }
+      desiredX = sumCenterX / players.length;
+    }
+    desiredX = clampDouble(desiredX, minX, maxX);
     final double targetY = worldH * 0.5;
 
-    double nextX = camera.x;
-    if ((desiredX - nextX).abs() > cameraDeadZoneX) {
-      nextX = nextX + (desiredX - nextX) * cameraFollowLerp;
-    }
-    nextX = clampDouble(nextX, minX, maxX);
-
-    camera.setPosition(nextX, targetY);
+    camera.setPosition(desiredX, targetY);
     camera.update();
   }
 
@@ -525,6 +505,11 @@ class PlayScreen extends ScreenAdapter {
     final Array<SpriteRuntimeState> runtimes = Array<SpriteRuntimeState>();
     for (int i = 0; i < data.sprites.size; i++) {
       final LevelSprite sprite = data.sprites.get(i);
+      final String token = normalize('${sprite.type} ${sprite.name}');
+      final bool looksPlayerTemplate =
+          token.contains('hero') ||
+          token.contains('player') ||
+          token.contains('foxy');
       runtimes.add(
         SpriteRuntimeState(
           sprite.frameIndex,
@@ -532,7 +517,7 @@ class PlayScreen extends ScreenAdapter {
           0,
           sprite.x,
           sprite.y,
-          false,
+          !looksPlayerTemplate,
           sprite.flipX,
           sprite.flipY,
           math.max(1, sprite.width.round()),
@@ -543,6 +528,28 @@ class PlayScreen extends ScreenAdapter {
       );
     }
     return runtimes;
+  }
+
+  void _renderBackground(SpriteBatch batch) {
+    final AssetManager assets = game.getAssetManager();
+    if (!assets.isLoaded(fallbackBackgroundTexture, Texture)) {
+      return;
+    }
+
+    final Texture texture = assets.get(fallbackBackgroundTexture, Texture);
+    final ui.Rect src = ui.Rect.fromLTWH(
+      0,
+      0,
+      texture.width.toDouble(),
+      texture.height.toDouble(),
+    );
+    final ui.Rect dst = ui.Rect.fromLTWH(
+      0,
+      0,
+      Gdx.graphics.getWidth().toDouble(),
+      Gdx.graphics.getHeight().toDouble(),
+    );
+    batch.drawRegion(texture, src, dst);
   }
 
   Array<RuntimeTransform> _createLayerRuntimeStates(LevelData data) {
@@ -618,7 +625,14 @@ class PlayScreen extends ScreenAdapter {
     bool flipX = false;
 
     if (inAir) {
-      return _frameFromTemplate(playerTemplate, animationName: animationName);
+      final _AnimatedSpriteFrame frame = _frameFromTemplate(
+        playerTemplate,
+        animationName: animationName,
+      );
+      if (!game.getAssetManager().isLoaded(frame.texturePath, Texture)) {
+        return _frameFromTemplate(playerTemplate);
+      }
+      return frame;
     }
 
     switch (facing) {
@@ -629,11 +643,15 @@ class PlayScreen extends ScreenAdapter {
         break;
     }
 
-    return _frameFromTemplate(
+    final _AnimatedSpriteFrame frame = _frameFromTemplate(
       playerTemplate,
       animationName: animationName,
       flipX: flipX,
     );
+    if (!game.getAssetManager().isLoaded(frame.texturePath, Texture)) {
+      return _frameFromTemplate(playerTemplate, flipX: flipX);
+    }
+    return frame;
   }
 
   String _playerSkinAnimationNameFor(MultiplayerPlayer player) {

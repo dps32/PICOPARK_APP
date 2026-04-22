@@ -81,7 +81,10 @@ class GameApp extends Game {
         queuedAssets.add(assetPath);
       }
     }
-    assetManager.load('other/enrrere.png', Texture);
+    if (!queuedAssets.contains('levels/media/background_2.png')) {
+      assetManager.load('levels/media/background_2.png', Texture);
+      queuedAssets.add('levels/media/background_2.png');
+    }
   }
 
   @override

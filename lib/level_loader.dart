@@ -275,9 +275,10 @@ class LevelLoader {
 
     final String? animationId = spriteNode['animationId'] as String?;
     int frameIndex = 0;
-    double anchorX = 0.5;
-    double anchorY = 0.5;
+    double anchorX = 0;
+    double anchorY = 0;
     String texturePath = 'levels/$imageFile';
+    final bool isPlayerLike = _looksPlayerLikeSprite(spriteNode);
 
     if (animationId != null) {
       final AnimationClip? clip = animationClips.get(animationId);
@@ -286,13 +287,15 @@ class LevelLoader {
           texturePath = clip.texturePath!;
         }
         frameIndex = math.max(0, clip.startFrame);
-        final FrameRig? startRig = clip.frameRigs.get(frameIndex);
-        if (startRig != null) {
-          anchorX = startRig.anchorX;
-          anchorY = startRig.anchorY;
-        } else {
-          anchorX = clip.anchorX;
-          anchorY = clip.anchorY;
+        if (isPlayerLike) {
+          final FrameRig? startRig = clip.frameRigs.get(frameIndex);
+          if (startRig != null) {
+            anchorX = startRig.anchorX;
+            anchorY = startRig.anchorY;
+          } else {
+            anchorX = clip.anchorX;
+            anchorY = clip.anchorY;
+          }
         }
       }
     }
@@ -322,6 +325,17 @@ class LevelLoader {
       texturePath,
       animationId,
     );
+  }
+
+  static bool _looksPlayerLikeSprite(Map<String, dynamic> spriteNode) {
+    final String type = normalize((spriteNode['type'] as String?) ?? '');
+    final String name = normalize((spriteNode['name'] as String?) ?? '');
+    return type.contains('hero') ||
+        type.contains('player') ||
+        type.contains('foxy') ||
+        name.contains('hero') ||
+        name.contains('player') ||
+        name.contains('foxy');
   }
 
   static ObjectMap<String, _MediaFrameSize> _loadMediaFrameSizes(

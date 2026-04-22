@@ -709,15 +709,18 @@ class AppData extends ChangeNotifier {
       final Map<String, dynamic> selfPlayer = _mapFromDynamic(rawSelfPlayer);
       final String selfId = (selfPlayer['id'] as String? ?? '').trim();
       if (selfId.isNotEmpty) {
+        playerId ??= selfId;
         nextDynamicById[selfId] = _dynamicPlayerFromJson(selfPlayer);
       }
     }
 
     if (state.containsKey('otherPlayers')) {
       final String currentPlayerId = (playerId ?? '').trim();
-      nextDynamicById.removeWhere(
-        (String id, _PlayerDynamicData _) => id != currentPlayerId,
-      );
+      if (currentPlayerId.isNotEmpty) {
+        nextDynamicById.removeWhere(
+          (String id, _PlayerDynamicData _) => id != currentPlayerId,
+        );
+      }
 
       final List<dynamic> rawOtherPlayers =
           state['otherPlayers'] as List<dynamic>? ?? [];
