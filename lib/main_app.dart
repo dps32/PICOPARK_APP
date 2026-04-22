@@ -18,6 +18,14 @@ class MainApp {
   static Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     await configureGameWindow('NetanFruits');
+    final TargetPlatform platform = defaultTargetPlatform;
+    if (platform == TargetPlatform.android || platform == TargetPlatform.iOS) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
     runApp(const _GameRoot());
   }
 }
@@ -356,11 +364,11 @@ class _GameViewState extends State<_GameView>
     Gdx.input.onPointerUp(gameOffset.dx, gameOffset.dy);
   }
 
-  bool _showMobileControls(BoxConstraints constraints) {
+  bool _showMobileControls() {
     final TargetPlatform platform = defaultTargetPlatform;
     final bool isMobilePlatform =
         platform == TargetPlatform.android || platform == TargetPlatform.iOS;
-    return isMobilePlatform;
+    return isMobilePlatform && _game.getScreen() is PlayScreen;
   }
 
   void _setJoystickDirection(String nextDirection) {
@@ -431,7 +439,7 @@ class _GameViewState extends State<_GameView>
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           _surfaceSize = Size(constraints.maxWidth, constraints.maxHeight);
-          final bool showMobileControls = _showMobileControls(constraints);
+          final bool showMobileControls = _showMobileControls();
           if (_isLetterboxedMode()) {
             _updateLetterbox(_surfaceSize);
           } else {
