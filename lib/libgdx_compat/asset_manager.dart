@@ -18,6 +18,7 @@ class Texture {
 
 class AssetManager {
   final Map<String, Texture> _texturesByPath = <String, Texture>{};
+  final Map<String, Object> _loadErrorsByPath = <String, Object>{};
   final List<String> _queue = <String>[];
   final Set<String> _queuedSet = <String>{};
 
@@ -33,6 +34,7 @@ class AssetManager {
     if (_texturesByPath.containsKey(path) || _queuedSet.contains(path)) {
       return;
     }
+    _loadErrorsByPath.remove(path);
     if (!_batchOpen && _queue.isEmpty && _activeLoad == null) {
       _batchOpen = true;
       _batchRequested = 0;
@@ -69,6 +71,14 @@ class AssetManager {
     return _texturesByPath.containsKey(path);
   }
 
+  bool hasLoadError(String path) {
+    return _loadErrorsByPath.containsKey(path);
+  }
+
+  Object? getLoadError(String path) {
+    return _loadErrorsByPath[path];
+  }
+
   Texture get(String path, Type type) {
     if (type != Texture) {
       throw StateError('Unsupported asset type for $path: $type');
@@ -84,6 +94,7 @@ class AssetManager {
     final Texture? texture = _texturesByPath.remove(path);
     texture?.dispose();
     _queuedSet.remove(path);
+    _loadErrorsByPath.remove(path);
   }
 
   void dispose() {
@@ -91,6 +102,7 @@ class AssetManager {
       texture.dispose();
     }
     _texturesByPath.clear();
+    _loadErrorsByPath.clear();
     _queue.clear();
     _queuedSet.clear();
     _activeLoad = null;
@@ -110,7 +122,10 @@ class AssetManager {
           _texturesByPath[path] = texture;
           _batchCompleted += 1;
         })
-        .catchError((Object _) {
+        .catchError((Object error) {
+          _loadErrorsByPath[path] = error;
+          // ignore: avoid_print
+          print('[AssetManager] Failed to load texture $path: $error');
           // Count failed assets as completed so loading screens can finish.
           _batchCompleted += 1;
         })

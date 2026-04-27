@@ -823,9 +823,7 @@ class LevelLoader {
         if (attempt >= maxAttempts - 1) {
           return null;
         }
-        await Future<void>.delayed(
-          Duration(milliseconds: 80 * (attempt + 1)),
-        );
+        await Future<void>.delayed(Duration(milliseconds: 80 * (attempt + 1)));
       }
     }
 
@@ -853,16 +851,20 @@ class LevelLoader {
               'x': 0,
               'y': 0,
               'depth': 0.0,
-              'tilesSheetFile': 'media/Proyecto nuevo.png',
-              'tilesWidth': 50,
-              'tilesHeight': 50,
+              'tilesSheetFile': 'media/sandia.png',
+              'tilesWidth': 16,
+              'tilesHeight': 16,
               'visible': true,
               'groupId': '__main__',
               'tileMapFile': 'tilemaps/level_000_layer_000.json',
-            }
+            },
           ],
           'layerGroups': <Map<String, dynamic>>[
-            <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+            <String, dynamic>{
+              'id': '__main__',
+              'name': 'Main',
+              'collapsed': false,
+            },
           ],
           'sprites': <Map<String, dynamic>>[
             <String, dynamic>{
@@ -872,17 +874,21 @@ class LevelLoader {
               'animationId': 'anim_1772099194341380',
               'x': 32,
               'y': 32,
-              'width': 20,
-              'height': 20,
-              'imageFile': 'media/16x16 Idle-Sheet.png',
+              'width': 32,
+              'height': 32,
+              'imageFile': 'media/netanfruits_2.png',
               'flipX': false,
               'flipY': false,
               'depth': 0.0,
               'groupId': '__main__',
-            }
+            },
           ],
           'spriteGroups': <Map<String, dynamic>>[
-            <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
+            <String, dynamic>{
+              'id': '__main__',
+              'name': 'Main',
+              'collapsed': false,
+            },
           ],
           'groupId': '__main__',
           'viewportWidth': 560,
@@ -896,7 +902,7 @@ class LevelLoader {
           'depthSensitivity': 0.08,
           'zonesFile': 'zones/level_000_zones.json',
           'pathsFile': 'paths/level_000_paths.json',
-        }
+        },
       ],
       'levelGroups': <Map<String, dynamic>>[
         <String, dynamic>{'id': '__main__', 'name': 'Main', 'collapsed': false},
@@ -912,17 +918,17 @@ class LevelLoader {
           'groupId': '__main__',
         },
         <String, dynamic>{
-          'name': 'sandia_suelo',
-          'fileName': 'media/Proyecto nuevo.png',
+          'name': 'sandia',
+          'fileName': 'media/sandia.png',
           'mediaType': 'tileset',
-          'tileWidth': 50,
-          'tileHeight': 50,
+          'tileWidth': 16,
+          'tileHeight': 16,
           'selectionColorHex': '#FFCC00',
           'groupId': '__main__',
         },
         <String, dynamic>{
           'name': 'Character Idle',
-          'fileName': 'media/16x16 Idle-Sheet.png',
+          'fileName': 'media/netanfruits_2.png',
           'mediaType': 'spritesheet',
           'tileWidth': 20,
           'tileHeight': 20,

@@ -41,7 +41,8 @@ class PlayScreen extends ScreenAdapter {
   static final ui.Color dimTextColor = colorValueOf('9FA4AD');
   static final ui.Color localPlayerColor = colorValueOf('0038B8');
   static final ui.Color winnerOverlayColor = colorValueOf('000000B8');
-  static const String fallbackBackgroundTexture = 'levels/media/background_2.png';
+  static const String fallbackBackgroundTexture =
+      'levels/media/background_2.png';
 
   final GameApp game;
   final int levelIndex;
@@ -81,14 +82,19 @@ class PlayScreen extends ScreenAdapter {
   }
 
   @override
+  void show() {
+    game.queueReferencedAssetsForLevel(levelIndex);
+  }
+
+  @override
   void render(double delta) {
     elapsedSeconds += math.max(0, math.min(delta, maxFrameSeconds));
 
     final AppData appData = game.getAppData();
     // Solo vuelve a WaitingRoom si NO está en LOCAL mode (LOCAL mode siempre juega)
     if ((appData.phase == MatchPhase.waiting ||
-      appData.phase == MatchPhase.connecting) &&
-      appData.roomCode != 'LOCAL') {
+            appData.phase == MatchPhase.connecting) &&
+        appData.roomCode != 'LOCAL') {
       _submitDirection(appData, 'none');
       game.setScreen(WaitingRoomScreen(game, levelIndex));
       return;
@@ -96,6 +102,13 @@ class PlayScreen extends ScreenAdapter {
 
     if (Gdx.input.isKeyJustPressed(Input.keys.f3)) {
       _showDebugOverlay = !_showDebugOverlay;
+    }
+
+    game.queueReferencedAssetsForLevel(levelIndex);
+    game.getAssetManager().update(17);
+    if (!game.hasRenderableAssetsForLevel(levelData)) {
+      _renderMatchLoading();
+      return;
     }
 
     _submitDirection(appData, _readCurrentDirection());
@@ -550,6 +563,40 @@ class PlayScreen extends ScreenAdapter {
       Gdx.graphics.getHeight().toDouble(),
     );
     batch.drawRegion(texture, src, dst);
+  }
+
+  void _renderMatchLoading() {
+    final double screenWidth = Gdx.graphics.getWidth().toDouble();
+    final double screenHeight = Gdx.graphics.getHeight().toDouble();
+    final String? assetError = game.firstRenderableAssetError(levelData);
+
+    ScreenUtils.clear(colorValueOf('FFFFFF'));
+    final SpriteBatch batch = game.getBatch();
+    final BitmapFont font = game.getFont();
+    batch.begin();
+    _drawCenteredText(
+      batch,
+      font,
+      assetError == null
+          ? 'Cargando escenario...'
+          : 'No se pudo cargar el escenario',
+      screenHeight * 0.5,
+      1.4,
+      titleColor,
+      maxWidth: screenWidth,
+    );
+    if (assetError != null) {
+      _drawCenteredText(
+        batch,
+        font,
+        assetError,
+        screenHeight * 0.5 + 32,
+        0.75,
+        dimTextColor,
+        maxWidth: screenWidth,
+      );
+    }
+    batch.end();
   }
 
   Array<RuntimeTransform> _createLayerRuntimeStates(LevelData data) {

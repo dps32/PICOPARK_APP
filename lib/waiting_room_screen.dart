@@ -45,9 +45,7 @@ class WaitingRoomScreen extends ScreenAdapter {
 
   final GameApp game;
   final int levelIndex;
-  final Viewport viewport = ScreenViewport(
-    OrthographicCamera(),
-  );
+  final Viewport viewport = ScreenViewport(OrthographicCamera());
   final GlyphLayout layout = GlyphLayout();
   final Vector3 pointer = Vector3(0, 0, 0);
   final Rectangle playButtonBounds = Rectangle();
@@ -59,6 +57,11 @@ class WaitingRoomScreen extends ScreenAdapter {
   }
 
   @override
+  void show() {
+    game.queueReferencedAssetsForLevel(levelIndex);
+  }
+
+  @override
   void render(double delta) {
     final AppData appData = game.getAppData();
 
@@ -67,6 +70,12 @@ class WaitingRoomScreen extends ScreenAdapter {
 
     if (appData.phase == MatchPhase.playing ||
         appData.phase == MatchPhase.finished) {
+      game.queueReferencedAssetsForLevel(levelIndex);
+      game.getAssetManager().update(17);
+      if (!game.hasRenderableAssetsForLevel(levelData)) {
+        _renderMatchLoading();
+        return;
+      }
       game.setScreen(PlayScreen(game, levelIndex));
       return;
     }
@@ -76,7 +85,8 @@ class WaitingRoomScreen extends ScreenAdapter {
 
     final double screenWidth = viewport.worldWidth;
     final double screenHeight = viewport.worldHeight;
-    final double scale = math.min(screenWidth / 1280.0, screenHeight / 720.0)
+    final double scale = math
+        .min(screenWidth / 1280.0, screenHeight / 720.0)
         .clamp(0.78, 1.35);
     final double cardWidth = _baseCardWidth * scale;
     final double cardHeight = _baseCardHeight * scale;
@@ -260,10 +270,44 @@ class WaitingRoomScreen extends ScreenAdapter {
     font.getData().setScale(1);
   }
 
+  void _renderMatchLoading() {
+    ScreenUtils.clear(background);
+    viewport.apply();
+
+    final String? assetError = game.firstRenderableAssetError(levelData);
+    final SpriteBatch batch = game.getBatch();
+    final BitmapFont font = game.getFont();
+    batch.begin();
+    _drawCenteredText(
+      batch,
+      font,
+      assetError == null
+          ? 'Cargando escenario...'
+          : 'No se pudo cargar el escenario',
+      viewport.worldWidth,
+      viewport.worldHeight * 0.5,
+      1.4,
+      titleColor,
+    );
+    if (assetError != null) {
+      _drawCenteredText(
+        batch,
+        font,
+        assetError,
+        viewport.worldWidth,
+        viewport.worldHeight * 0.5 + 32,
+        0.75,
+        dimTextColor,
+      );
+    }
+    batch.end();
+  }
+
   void _updatePlayButtonBounds() {
     final double screenWidth = viewport.worldWidth;
     final double screenHeight = viewport.worldHeight;
-    final double scale = math.min(screenWidth / 1280.0, screenHeight / 720.0)
+    final double scale = math
+        .min(screenWidth / 1280.0, screenHeight / 720.0)
         .clamp(0.78, 1.35);
     final double playButtonWidth = _basePlayButtonWidth * scale;
     final double playButtonHeight = _basePlayButtonHeight * scale;

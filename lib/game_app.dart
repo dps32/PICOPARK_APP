@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-
 import 'app_data.dart';
 import 'libgdx_compat/asset_manager.dart';
 import 'libgdx_compat/game_framework.dart';
 import 'libgdx_compat/gdx.dart';
 import 'libgdx_compat/gdx_collections.dart';
+import 'level_data.dart';
+import 'level_loader.dart';
 import 'loading_screen.dart';
 import 'network_config.dart';
-import 'level_loader.dart';
 
 class GameApp extends Game {
   static const int multiplayerLevelIndex = 0;
@@ -67,24 +67,55 @@ class GameApp extends Game {
   AppData getAppData() => appData;
 
   void queueReferencedAssetsForLevel(int levelIndex) {
-    if (levelIndex < 0 || levelIndex >= referencedImageFilesByLevel.size) {
-      return;
-    }
-
-    final Array<String> levelFiles = referencedImageFilesByLevel.get(
-      levelIndex,
-    );
-    for (final String relativePath in levelFiles.iterable()) {
-      final String assetPath = 'levels/$relativePath';
+    for (final String assetPath in referencedAssetPathsForLevel(levelIndex)) {
       if (!queuedAssets.contains(assetPath)) {
         assetManager.load(assetPath, Texture);
         queuedAssets.add(assetPath);
       }
     }
-    if (!queuedAssets.contains('levels/media/background_2.png')) {
-      assetManager.load('levels/media/background_2.png', Texture);
-      queuedAssets.add('levels/media/background_2.png');
+  }
+
+  List<String> referencedAssetPathsForLevel(int levelIndex) {
+    final List<String> paths = <String>[];
+    if (levelIndex >= 0 && levelIndex < referencedImageFilesByLevel.size) {
+      final Array<String> levelFiles = referencedImageFilesByLevel.get(
+        levelIndex,
+      );
+      for (final String relativePath in levelFiles.iterable()) {
+        paths.add('levels/$relativePath');
+      }
     }
+    if (!paths.contains('levels/media/background_2.png')) {
+      paths.add('levels/media/background_2.png');
+    }
+    return paths;
+  }
+
+  bool hasRenderableAssetsForLevel(LevelData levelData) {
+    final bool backgroundLoaded = assetManager.isLoaded(
+      'levels/media/background_2.png',
+      Texture,
+    );
+    final bool visibleLayerLoaded = levelData.layers.iterable().any(
+      (LevelLayer layer) =>
+          layer.visible &&
+          assetManager.isLoaded(layer.tilesTexturePath, Texture),
+    );
+    return backgroundLoaded || visibleLayerLoaded;
+  }
+
+  String? firstRenderableAssetError(LevelData levelData) {
+    final List<String> renderablePaths = <String>[
+      'levels/media/background_2.png',
+      for (final LevelLayer layer in levelData.layers.iterable())
+        if (layer.visible) layer.tilesTexturePath,
+    ];
+    for (final String path in renderablePaths) {
+      if (assetManager.hasLoadError(path)) {
+        return '$path: ${assetManager.getLoadError(path)}';
+      }
+    }
+    return null;
   }
 
   @override
