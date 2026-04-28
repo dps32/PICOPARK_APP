@@ -85,15 +85,15 @@ class GameApp extends Game {
         paths.add('levels/$relativePath');
       }
     }
-    if (!paths.contains('levels/media/background_2.png')) {
-      paths.add('levels/media/background_2.png');
+    if (!paths.contains('levels/media/background.png')) {
+      paths.add('levels/media/background.png');
     }
     return paths;
   }
 
   bool hasRenderableAssetsForLevel(LevelData levelData) {
     final bool backgroundLoaded = assetManager.isLoaded(
-      'levels/media/background_2.png',
+      'levels/media/background.png',
       Texture,
     );
     final bool visibleLayerLoaded = levelData.layers.iterable().any(
@@ -106,7 +106,7 @@ class GameApp extends Game {
 
   String? firstRenderableAssetError(LevelData levelData) {
     final List<String> renderablePaths = <String>[
-      'levels/media/background_2.png',
+      'levels/media/background.png',
       for (final LevelLayer layer in levelData.layers.iterable())
         if (layer.visible) layer.tilesTexturePath,
     ];

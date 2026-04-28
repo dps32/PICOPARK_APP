@@ -10,6 +10,7 @@ import 'libgdx_compat/gdx.dart';
 import 'level_loader.dart';
 import 'network_config.dart';
 import 'play_screen.dart';
+import 'waiting_room_screen.dart';
 import 'window_config.dart';
 
 class MainApp {
@@ -200,7 +201,8 @@ class _ConfigurationScreenState extends State<_ConfigurationScreen> {
                     controller: _roomCodeController,
                     decoration: const InputDecoration(
                       labelText: 'Room code (ignored)',
-                      helperText: 'This build uses a single global room for all players.',
+                      helperText:
+                          'This build uses a single global room for all players.',
                       border: OutlineInputBorder(),
                     ),
                     textCapitalization: TextCapitalization.characters,
@@ -431,6 +433,9 @@ class _GameViewState extends State<_GameView>
     final AppData appData = _game.getAppData();
     final bool showRestartOverlay =
         _game.getScreen() is PlayScreen && appData.phase == MatchPhase.finished;
+    final bool showWaitingRoomPlayHitTarget =
+        _game.getScreen() is WaitingRoomScreen &&
+        appData.phase == MatchPhase.waiting;
 
     return Focus(
       focusNode: _focusNode,
@@ -467,6 +472,15 @@ class _GameViewState extends State<_GameView>
             constraints.maxHeight - 84,
             constraints.maxHeight * 0.64,
           );
+          final double waitingScale = math
+              .min(constraints.maxWidth / 1280.0, constraints.maxHeight / 720.0)
+              .clamp(0.78, 1.35);
+          final double waitingPlayButtonWidth = 280 * waitingScale;
+          final double waitingPlayButtonHeight = 68 * waitingScale;
+          final double waitingPlayButtonLeft =
+              (constraints.maxWidth - waitingPlayButtonWidth) * 0.5;
+          final double waitingPlayButtonTop =
+              constraints.maxHeight * 0.5 + 180 * waitingScale;
           return Listener(
             child: Stack(
               fit: StackFit.expand,
@@ -544,6 +558,20 @@ class _GameViewState extends State<_GameView>
                           ? appData.requestMatchRestart
                           : null,
                       child: const Text('Restart Match'),
+                    ),
+                  ),
+                if (showWaitingRoomPlayHitTarget)
+                  Positioned(
+                    left: waitingPlayButtonLeft,
+                    top: waitingPlayButtonTop,
+                    width: waitingPlayButtonWidth,
+                    height: waitingPlayButtonHeight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: appData.canRequestMatchStart
+                          ? appData.requestMatchStart
+                          : null,
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 if (showMobileControls)
@@ -649,8 +677,10 @@ class _VirtualJoystickState extends State<_VirtualJoystick> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanStart: (DragStartDetails details) => _updateFromPosition(details.localPosition),
-      onPanUpdate: (DragUpdateDetails details) => _updateFromPosition(details.localPosition),
+      onPanStart: (DragStartDetails details) =>
+          _updateFromPosition(details.localPosition),
+      onPanUpdate: (DragUpdateDetails details) =>
+          _updateFromPosition(details.localPosition),
       onPanEnd: (_) => _reset(),
       onPanCancel: _reset,
       child: SizedBox(
@@ -676,7 +706,10 @@ class _VirtualJoystickState extends State<_VirtualJoystick> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: knobColor,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -704,7 +737,10 @@ class _JumpButton extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: const Color(0xFF0038B8).withValues(alpha: 0.84),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.35),
+            width: 2,
+          ),
           boxShadow: <BoxShadow>[
             BoxShadow(
               color: const Color(0xFF6F7682).withValues(alpha: 0.35),

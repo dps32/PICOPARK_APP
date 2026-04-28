@@ -42,7 +42,7 @@ class PlayScreen extends ScreenAdapter {
   static final ui.Color localPlayerColor = colorValueOf('0038B8');
   static final ui.Color winnerOverlayColor = colorValueOf('000000B8');
   static const String fallbackBackgroundTexture =
-      'levels/media/background_2.png';
+      'levels/media/background.png';
 
   final GameApp game;
   final int levelIndex;
@@ -58,6 +58,7 @@ class PlayScreen extends ScreenAdapter {
   late final Array<RuntimeTransform> layerRuntimeStates;
   late final Array<RuntimeTransform> zoneRuntimeStates;
   late final LevelSprite playerTemplate;
+  late final LevelSprite? keyTemplate;
   late final Map<String, LevelSprite> gemTemplateByType;
 
   double elapsedSeconds = 0;
@@ -72,6 +73,7 @@ class PlayScreen extends ScreenAdapter {
     layerRuntimeStates = _createLayerRuntimeStates(levelData);
     zoneRuntimeStates = _createZoneRuntimeStates(levelData);
     playerTemplate = _findPlayerTemplate(levelData);
+    keyTemplate = _findKeyTemplate(levelData);
     gemTemplateByType = _buildGemTemplates(levelData);
     _applyInitialCameraFromLevel();
     viewport.update(
@@ -135,6 +137,7 @@ class PlayScreen extends ScreenAdapter {
     );
     _renderGems(batch, appData.gems);
     _renderPlayers(batch, appData.sortedPlayers, appData.playerId);
+    _renderMatchKey(batch, appData.matchKey);
     batch.end();
     if (_showDebugOverlay) {
       debugOverlay.render(
@@ -229,6 +232,23 @@ class PlayScreen extends ScreenAdapter {
         height: gem.height,
       );
     }
+  }
+
+  void _renderMatchKey(SpriteBatch batch, MultiplayerKey? matchKey) {
+    final LevelSprite? template = keyTemplate;
+    if (template == null || matchKey == null) {
+      return;
+    }
+
+    final _AnimatedSpriteFrame frame = _frameFromTemplate(template);
+    _drawAnimatedSprite(
+      batch,
+      frame: frame,
+      worldX: matchKey.x,
+      worldY: matchKey.y,
+      width: matchKey.width,
+      height: matchKey.height,
+    );
   }
 
   void _drawAnimatedSprite(
@@ -463,23 +483,29 @@ class PlayScreen extends ScreenAdapter {
     final double worldW = math.max(1, levelData.worldWidth);
     final double worldH = math.max(1, levelData.worldHeight);
     final double viewW = math.max(1, viewport.worldWidth);
+    final double viewH = math.max(1, viewport.worldHeight);
     final double halfW = viewW * 0.5;
+    final double halfH = viewH * 0.5;
     final double minX = halfW;
     final double maxX = math.max(halfW, worldW - halfW);
+    final double minY = halfH;
+    final double maxY = math.max(halfH, worldH - halfH);
 
-    final List<MultiplayerPlayer> players = appData.sortedPlayers;
-    double desiredX = worldW * 0.5;
-    if (players.isNotEmpty) {
-      double sumCenterX = 0;
-      for (final MultiplayerPlayer player in players) {
-        sumCenterX += player.x + player.width * 0.5;
-      }
-      desiredX = sumCenterX / players.length;
+    double desiredX = levelData.viewportX + levelData.viewportWidth * 0.5;
+    double desiredY = levelData.viewportY + levelData.viewportHeight * 0.5;
+
+    final MultiplayerPlayer? focusPlayer =
+        appData.localPlayer ??
+        (appData.players.isNotEmpty ? appData.players.first : null);
+    if (focusPlayer != null) {
+      desiredX = focusPlayer.x + focusPlayer.width * 0.5;
+      desiredY = focusPlayer.y + focusPlayer.height * 0.5;
     }
-    desiredX = clampDouble(desiredX, minX, maxX);
-    final double targetY = worldH * 0.5;
 
-    camera.setPosition(desiredX, targetY);
+    desiredX = clampDouble(desiredX, minX, maxX);
+    desiredY = clampDouble(desiredY, minY, maxY);
+
+    camera.setPosition(desiredX, desiredY);
     camera.update();
   }
 
@@ -523,6 +549,10 @@ class PlayScreen extends ScreenAdapter {
           token.contains('hero') ||
           token.contains('player') ||
           token.contains('foxy');
+      final bool looksKeyTemplate =
+          token.contains('netankey') ||
+          token.contains('key') ||
+          token.contains('llave');
       runtimes.add(
         SpriteRuntimeState(
           sprite.frameIndex,
@@ -530,7 +560,7 @@ class PlayScreen extends ScreenAdapter {
           0,
           sprite.x,
           sprite.y,
-          !looksPlayerTemplate,
+          !looksPlayerTemplate && !looksKeyTemplate,
           sprite.flipX,
           sprite.flipY,
           math.max(1, sprite.width.round()),
@@ -646,6 +676,19 @@ class PlayScreen extends ScreenAdapter {
       }
     }
     return data.sprites.first();
+  }
+
+  LevelSprite? _findKeyTemplate(LevelData data) {
+    for (final LevelSprite sprite in data.sprites.iterable()) {
+      final String token = normalize('${sprite.type} ${sprite.name}');
+      if (token.contains('netankey') ||
+          token.contains(' key') ||
+          token.startsWith('key') ||
+          token.contains('llave')) {
+        return sprite;
+      }
+    }
+    return null;
   }
 
   Map<String, LevelSprite> _buildGemTemplates(LevelData data) {

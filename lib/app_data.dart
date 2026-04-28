@@ -93,6 +93,35 @@ class MultiplayerGem {
   }
 }
 
+class MultiplayerKey {
+  final bool picked;
+  final String carrierId;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+
+  const MultiplayerKey({
+    required this.picked,
+    required this.carrierId,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+  });
+
+  factory MultiplayerKey.fromJson(Map<String, dynamic> json) {
+    return MultiplayerKey(
+      picked: json['picked'] as bool? ?? false,
+      carrierId: (json['carrierId'] as String? ?? '').trim(),
+      x: (json['x'] as num? ?? 0).toDouble(),
+      y: (json['y'] as num? ?? 0).toDouble(),
+      width: (json['width'] as num? ?? 16).toDouble(),
+      height: (json['height'] as num? ?? 16).toDouble(),
+    );
+  }
+}
+
 class TransformSnapshot {
   final int index;
   final double x;
@@ -188,6 +217,7 @@ class AppData extends ChangeNotifier {
   String? winnerId;
   List<MultiplayerPlayer> players = const <MultiplayerPlayer>[];
   List<MultiplayerGem> gems = const <MultiplayerGem>[];
+  MultiplayerKey? matchKey;
   List<TransformSnapshot> layerTransforms = const <TransformSnapshot>[];
   List<TransformSnapshot> zoneTransforms = const <TransformSnapshot>[];
 
@@ -306,14 +336,18 @@ class AppData extends ChangeNotifier {
   void requestMatchStart() {
     if (!canRequestMatchStart) {
       if (kDebugMode) {
-        print('[PLAY BUTTON] No es pot iniciar: isConnected=$isConnected, phase=$phase, isRoomHost=$isRoomHost, players=$players.length/$minPlayers');
+        print(
+          '[PLAY BUTTON] No es pot iniciar: isConnected=$isConnected, phase=$phase, isRoomHost=$isRoomHost, players=$players.length/$minPlayers',
+        );
       }
       return;
     }
 
     if (_shouldUseLocalBots) {
       if (kDebugMode) {
-        print('[LOCAL MODE] Inicia partida localment amb ${players.length} jugadors (${players.where((p) => p.id.startsWith('bot_')).length} bots)');
+        print(
+          '[LOCAL MODE] Inicia partida localment amb ${players.length} jugadors (${players.where((p) => p.id.startsWith('bot_')).length} bots)',
+        );
       }
       roomStatus = 'in_game';
       phase = MatchPhase.playing;
@@ -342,6 +376,7 @@ class AppData extends ChangeNotifier {
     isRoomHost = false;
     players = const <MultiplayerPlayer>[];
     gems = const <MultiplayerGem>[];
+    matchKey = null;
     _playerStaticById = const <String, _PlayerStaticData>{};
     _playerDynamicById = const <String, _PlayerDynamicData>{};
     notifyListeners();
@@ -371,23 +406,29 @@ class AppData extends ChangeNotifier {
     isConnected = false;
     phase = MatchPhase.connecting;
     roomErrorMessage = null;
-    
+
     if (_shouldUseLocalBots) {
       if (kDebugMode) {
         print('[LOCAL MODE] Inicialitzant mode local amb bots');
-        print('[LOCAL MODE] Minimum de jugadors requerits: $_minimumPlayersRequired');
+        print(
+          '[LOCAL MODE] Minimum de jugadors requerits: $_minimumPlayersRequired',
+        );
       }
     } else {
       if (kDebugMode) {
-        print('[REMOTE MODE] Connectant a servidor remot: ${networkConfig.serverHost}:${networkConfig.serverPort}');
+        print(
+          '[REMOTE MODE] Connectant a servidor remot: ${networkConfig.serverHost}:${networkConfig.serverPort}',
+        );
       }
     }
-    
+
     notifyListeners();
 
     if (_shouldUseLocalBots) {
       if (kDebugMode) {
-        print('[LOCAL MODE] Saltant connexió WebSocket, registrant jugador localment');
+        print(
+          '[LOCAL MODE] Saltant connexió WebSocket, registrant jugador localment',
+        );
       }
       _initializeLocalMode();
       return;
@@ -407,11 +448,11 @@ class AppData extends ChangeNotifier {
     if (_disposed) {
       return;
     }
-    
+
     if (kDebugMode) {
       print('[LOCAL MODE] Inicialitzant estat local');
     }
-    
+
     _markConnected();
     playerId = 'local_player_${DateTime.now().millisecondsSinceEpoch}';
     roomCode = 'LOCAL';
@@ -420,7 +461,7 @@ class AppData extends ChangeNotifier {
     isRoomHost = true;
     minPlayers = _minimumPlayersRequired;
     maxPlayers = 8;
-    
+
     final MultiplayerPlayer localPlayer = MultiplayerPlayer(
       id: playerId!,
       name: playerName,
@@ -437,7 +478,7 @@ class AppData extends ChangeNotifier {
       onGround: true,
       joinOrder: 0,
     );
-    
+
     _playerStaticById = <String, _PlayerStaticData>{
       playerId!: _PlayerStaticData(
         id: playerId!,
@@ -447,7 +488,7 @@ class AppData extends ChangeNotifier {
         joinOrder: 0,
       ),
     };
-    
+
     _playerDynamicById = <String, _PlayerDynamicData>{
       playerId!: _PlayerDynamicData(
         id: playerId!,
@@ -462,13 +503,13 @@ class AppData extends ChangeNotifier {
         onGround: true,
       ),
     };
-    
+
     players = _applyLocalBots(<MultiplayerPlayer>[localPlayer]);
-    
+
     if (kDebugMode) {
       print('[LOCAL MODE] Jugador local registrat: $playerId ($playerName)');
     }
-    
+
     notifyListeners();
   }
 
@@ -486,7 +527,8 @@ class AppData extends ChangeNotifier {
       if (type == 'welcome' || type == 'server:connected') {
         _markConnected();
         final String candidateId =
-            (payload['socketId'] as String? ?? _wsHandler.socketId ?? '').trim();
+            (payload['socketId'] as String? ?? _wsHandler.socketId ?? '')
+                .trim();
         if (candidateId.isNotEmpty) {
           playerId = candidateId;
         }
@@ -557,8 +599,9 @@ class AppData extends ChangeNotifier {
       if (type == 'update') {
         _markConnected();
         final Object? rawGameState = data['gameState'];
-        final Map<String, dynamic> gameState =
-            rawGameState is Map ? _mapFromDynamic(rawGameState) : {};
+        final Map<String, dynamic> gameState = rawGameState is Map
+            ? _mapFromDynamic(rawGameState)
+            : {};
         _applySnapshotState(gameState);
         _applyGameplayState(gameState);
         notifyListeners();
@@ -614,8 +657,8 @@ class AppData extends ChangeNotifier {
       isRoomHost = hostId.isNotEmpty && hostId == localId;
     }
 
-    final List<dynamic> roomPlayers = room['players'] as List<dynamic>? ??
-        const <dynamic>[];
+    final List<dynamic> roomPlayers =
+        room['players'] as List<dynamic>? ?? const <dynamic>[];
 
     final Map<String, _PlayerStaticData> staticById =
         <String, _PlayerStaticData>{};
@@ -626,16 +669,19 @@ class AppData extends ChangeNotifier {
     for (final Map rawPlayer in roomPlayers.whereType<Map>()) {
       final Map<String, dynamic> player = _mapFromDynamic(rawPlayer);
       final String id =
-          (player['socketId'] as String? ?? player['id'] as String? ?? '').trim();
+          (player['socketId'] as String? ?? player['id'] as String? ?? '')
+              .trim();
       if (id.isEmpty) {
         continue;
       }
 
       final String name =
-          (player['nickname'] as String? ?? player['name'] as String? ?? 'Player')
+          (player['nickname'] as String? ??
+                  player['name'] as String? ??
+                  'Player')
               .trim();
-      final int playerJoinOrder =
-          (player['joinOrder'] as num? ?? joinOrder).toInt();
+      final int playerJoinOrder = (player['joinOrder'] as num? ?? joinOrder)
+          .toInt();
       final bool playerIsHost = player['isHost'] as bool? ?? false;
       if (!isRoomHost && localId.isNotEmpty && id == localId) {
         isRoomHost = playerIsHost;
@@ -700,6 +746,10 @@ class AppData extends ChangeNotifier {
     remainingGems =
         (state['remainingGems'] as num? ?? state['gems']?.length ?? 0).toInt();
     winnerId = state['winnerId'] as String?;
+    final Object? rawKey = state['key'];
+    matchKey = rawKey is Map
+        ? MultiplayerKey.fromJson(_mapFromDynamic(rawKey))
+        : null;
 
     final Map<String, _PlayerDynamicData> nextDynamicById =
         Map<String, _PlayerDynamicData>.from(_playerDynamicById);
@@ -735,13 +785,15 @@ class AppData extends ChangeNotifier {
     } else if (state.containsKey('players')) {
       nextDynamicById
         ..clear()
-        ..addAll(<String, _PlayerDynamicData>{
-          for (final Map rawPlayer
-              in (state['players'] as List<dynamic>? ?? const <dynamic>[])
-                  .whereType<Map>())
-            (_mapFromDynamic(rawPlayer)['id'] as String? ?? '').trim():
-                _dynamicPlayerFromJson(_mapFromDynamic(rawPlayer)),
-        }..remove(''));
+        ..addAll(
+          <String, _PlayerDynamicData>{
+            for (final Map rawPlayer
+                in (state['players'] as List<dynamic>? ?? const <dynamic>[])
+                    .whereType<Map>())
+              (_mapFromDynamic(rawPlayer)['id'] as String? ?? '').trim():
+                  _dynamicPlayerFromJson(_mapFromDynamic(rawPlayer)),
+          }..remove(''),
+        );
     }
 
     _playerDynamicById = nextDynamicById;
@@ -803,26 +855,28 @@ class AppData extends ChangeNotifier {
       ..._playerStaticById.keys,
       ..._playerDynamicById.keys,
     };
-    final List<MultiplayerPlayer> basePlayers = ids.map((String id) {
-      final _PlayerStaticData? staticData = _playerStaticById[id];
-      final _PlayerDynamicData? dynamicData = _playerDynamicById[id];
-      return MultiplayerPlayer(
-        id: id,
-        name: staticData?.name ?? 'Player',
-        x: dynamicData?.x ?? 0,
-        y: dynamicData?.y ?? 0,
-        width: staticData?.width ?? 20,
-        height: staticData?.height ?? 20,
-        score: dynamicData?.score ?? 0,
-        gemsCollected: dynamicData?.gemsCollected ?? 0,
-        direction: dynamicData?.direction ?? 'none',
-        facing: dynamicData?.facing ?? 'down',
-        moving: dynamicData?.moving ?? false,
-        velocityY: dynamicData?.velocityY ?? 0,
-        onGround: dynamicData?.onGround ?? true,
-        joinOrder: staticData?.joinOrder ?? 0,
-      );
-    }).toList(growable: false);
+    final List<MultiplayerPlayer> basePlayers = ids
+        .map((String id) {
+          final _PlayerStaticData? staticData = _playerStaticById[id];
+          final _PlayerDynamicData? dynamicData = _playerDynamicById[id];
+          return MultiplayerPlayer(
+            id: id,
+            name: staticData?.name ?? 'Player',
+            x: dynamicData?.x ?? 0,
+            y: dynamicData?.y ?? 0,
+            width: staticData?.width ?? 20,
+            height: staticData?.height ?? 20,
+            score: dynamicData?.score ?? 0,
+            gemsCollected: dynamicData?.gemsCollected ?? 0,
+            direction: dynamicData?.direction ?? 'none',
+            facing: dynamicData?.facing ?? 'down',
+            moving: dynamicData?.moving ?? false,
+            velocityY: dynamicData?.velocityY ?? 0,
+            onGround: dynamicData?.onGround ?? true,
+            joinOrder: staticData?.joinOrder ?? 0,
+          );
+        })
+        .toList(growable: false);
 
     players = _applyLocalBots(basePlayers);
   }
@@ -836,20 +890,28 @@ class AppData extends ChangeNotifier {
       math.max(minPlayers, _minimumPlayersRequired),
       maxPlayers,
     );
-    
+
     if (kDebugMode) {
-      print('[BOTS] Mode=LOCAL | Base players=${basePlayers.length} | Target=$targetCount | Min=$minPlayers | Max=$maxPlayers');
+      print(
+        '[BOTS] Mode=LOCAL | Base players=${basePlayers.length} | Target=$targetCount | Min=$minPlayers | Max=$maxPlayers',
+      );
     }
-    
+
     if (basePlayers.length >= targetCount) {
       if (kDebugMode) {
-        print('[BOTS] No es necessari injectar bots (ja tenim $targetCount jugadors)');
+        print(
+          '[BOTS] No es necessari injectar bots (ja tenim $targetCount jugadors)',
+        );
       }
       return basePlayers;
     }
 
-    final List<MultiplayerPlayer> expanded = List<MultiplayerPlayer>.from(basePlayers);
-    final Set<String> usedIds = expanded.map((MultiplayerPlayer p) => p.id).toSet();
+    final List<MultiplayerPlayer> expanded = List<MultiplayerPlayer>.from(
+      basePlayers,
+    );
+    final Set<String> usedIds = expanded
+        .map((MultiplayerPlayer p) => p.id)
+        .toSet();
     final String currentLocalId = (playerId ?? '').trim();
     MultiplayerPlayer? local;
     if (currentLocalId.isNotEmpty) {
@@ -894,12 +956,16 @@ class AppData extends ChangeNotifier {
       usedIds.add(bot.id);
       botsAdded++;
       if (kDebugMode) {
-        print('[BOTS] Injectat ${bot.name} (${bot.id}) | Jugadors totals=${expanded.length}');
+        print(
+          '[BOTS] Injectat ${bot.name} (${bot.id}) | Jugadors totals=${expanded.length}',
+        );
       }
       joinOrder++;
     }
     if (kDebugMode) {
-      print('[BOTS] Injecció completada: $botsAdded bots afegits | Jugadors finals=${expanded.length}');
+      print(
+        '[BOTS] Injecció completada: $botsAdded bots afegits | Jugadors finals=${expanded.length}',
+      );
     }
     return expanded;
   }
@@ -922,10 +988,7 @@ class AppData extends ChangeNotifier {
         : playerName.trim();
     roomCode = 'GLOBAL';
 
-    _sendMessage(<String, dynamic>{
-      'type': 'register',
-      'playerName': safeName,
-    });
+    _sendMessage(<String, dynamic>{'type': 'register', 'playerName': safeName});
   }
 
   void _onWebSocketError(dynamic error) {
