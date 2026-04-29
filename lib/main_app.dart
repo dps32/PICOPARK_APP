@@ -298,10 +298,40 @@ class _GameViewState extends State<_GameView>
 
     if (event is KeyDownEvent) {
       Gdx.input.onKeyDown(keycode);
+      if (_isDirectionKey(keycode)) {
+        _sendCurrentDirection();
+      } else if (_isJumpKey(keycode)) {
+        _game.getAppData().requestJump();
+      }
     } else if (event is KeyUpEvent) {
       Gdx.input.onKeyUp(keycode);
+      if (_isDirectionKey(keycode)) {
+        _sendCurrentDirection();
+      }
     }
     return KeyEventResult.handled;
+  }
+
+  bool _isDirectionKey(int keycode) =>
+      keycode == Input.keys.left ||
+      keycode == Input.keys.right ||
+      keycode == Input.keys.a ||
+      keycode == Input.keys.d;
+
+  bool _isJumpKey(int keycode) =>
+      keycode == Input.keys.space ||
+      keycode == Input.keys.up ||
+      keycode == Input.keys.w;
+
+  void _sendCurrentDirection() {
+    final bool left =
+        Gdx.input.isKeyPressed(Input.keys.left) ||
+        Gdx.input.isKeyPressed(Input.keys.a);
+    final bool right =
+        Gdx.input.isKeyPressed(Input.keys.right) ||
+        Gdx.input.isKeyPressed(Input.keys.d);
+    final String direction = left ? 'left' : (right ? 'right' : 'none');
+    _game.getAppData().updateMovementDirection(direction);
   }
 
   bool _isLetterboxedMode() {
@@ -377,10 +407,8 @@ class _GameViewState extends State<_GameView>
     if (_joystickDirection == nextDirection) {
       return;
     }
-
     _releaseJoystickDirection();
     _joystickDirection = nextDirection;
-
     switch (nextDirection) {
       case 'left':
         Gdx.input.onKeyDown(Input.keys.left);
@@ -391,6 +419,7 @@ class _GameViewState extends State<_GameView>
       default:
         break;
     }
+    _game.getAppData().updateMovementDirection(nextDirection);
   }
 
   void _releaseJoystickDirection() {
@@ -405,11 +434,15 @@ class _GameViewState extends State<_GameView>
         break;
     }
     _joystickDirection = 'none';
+    if (_ready) {
+      _game.getAppData().updateMovementDirection('none');
+    }
   }
 
   void _tapJump() {
     Gdx.input.onKeyDown(Input.keys.space);
     Gdx.input.onKeyUp(Input.keys.space);
+    _game.getAppData().requestJump();
   }
 
   void _resizeGameIfNeeded(int width, int height, bool letterboxedMode) {

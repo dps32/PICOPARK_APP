@@ -17,8 +17,12 @@ class Texture {
 }
 
 class AssetManager {
+  static const int _maxRetries = 30;
+  static const Duration _retryDelay = Duration(seconds: 5);
+
   final Map<String, Texture> _texturesByPath = <String, Texture>{};
   final Map<String, Object> _loadErrorsByPath = <String, Object>{};
+  final Map<String, int> _failureCounts = <String, int>{};
   final List<String> _queue = <String>[];
   final Set<String> _queuedSet = <String>{};
 
@@ -26,12 +30,16 @@ class AssetManager {
   bool _batchOpen = false;
   int _batchRequested = 0;
   int _batchCompleted = 0;
+  bool _disposed = false;
 
   void load(String path, Type type) {
     if (type != Texture) {
       return;
     }
     if (_texturesByPath.containsKey(path) || _queuedSet.contains(path)) {
+      return;
+    }
+    if ((_failureCounts[path] ?? 0) >= _maxRetries) {
       return;
     }
     _loadErrorsByPath.remove(path);
@@ -95,14 +103,17 @@ class AssetManager {
     texture?.dispose();
     _queuedSet.remove(path);
     _loadErrorsByPath.remove(path);
+    _failureCounts.remove(path);
   }
 
   void dispose() {
+    _disposed = true;
     for (final Texture texture in _texturesByPath.values) {
       texture.dispose();
     }
     _texturesByPath.clear();
     _loadErrorsByPath.clear();
+    _failureCounts.clear();
     _queue.clear();
     _queuedSet.clear();
     _activeLoad = null;
@@ -120,14 +131,46 @@ class AssetManager {
     _activeLoad = _loadTexture(path)
         .then((Texture texture) {
           _texturesByPath[path] = texture;
+          _failureCounts.remove(path);
+          _loadErrorsByPath.remove(path);
           _batchCompleted += 1;
         })
         .catchError((Object error) {
-          _loadErrorsByPath[path] = error;
-          // ignore: avoid_print
-          print('[AssetManager] Failed to load texture $path: $error');
-          // Count failed assets as completed so loading screens can finish.
+          final int count = (_failureCounts[path] ?? 0) + 1;
+          _failureCounts[path] = count;
           _batchCompleted += 1;
+
+          // ignore: avoid_print
+          print(
+            '[AssetManager] Failed to load $path (attempt $count/$_maxRetries): $error',
+          );
+
+          if (count < _maxRetries) {
+            // Keep path in _queuedSet during the delay to block external re-queuing.
+            // After the delay, evict rootBundle cache and re-queue for a fresh attempt.
+            Future<void>.delayed(_retryDelay, () {
+              if (_disposed || _texturesByPath.containsKey(path)) {
+                return;
+              }
+              rootBundle.evict('assets/$path');
+              _queuedSet.remove(path);
+              if (!_batchOpen) {
+                _batchOpen = true;
+                _batchRequested = 0;
+                _batchCompleted = 0;
+              }
+              _queue.add(path);
+              _queuedSet.add(path);
+              _batchRequested += 1;
+              _pumpQueue();
+            });
+          } else {
+            // All retries exhausted: surface the error and unblock _queuedSet.
+            _loadErrorsByPath[path] = error;
+            _queuedSet.remove(path);
+            // ignore: avoid_print
+            print('[AssetManager] Giving up on $path after $count attempts.');
+          }
         })
         .whenComplete(() {
           _activeLoad = null;

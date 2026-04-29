@@ -62,7 +62,6 @@ class PlayScreen extends ScreenAdapter {
   late final Map<String, LevelSprite> gemTemplateByType;
 
   double elapsedSeconds = 0;
-  String _lastSubmittedDirection = 'none';
   bool _showDebugOverlay = false;
 
   PlayScreen(this.game, this.levelIndex) {
@@ -97,7 +96,7 @@ class PlayScreen extends ScreenAdapter {
     if ((appData.phase == MatchPhase.waiting ||
             appData.phase == MatchPhase.connecting) &&
         appData.roomCode != 'LOCAL') {
-      _submitDirection(appData, 'none');
+      appData.updateMovementDirection('none');
       game.setScreen(WaitingRoomScreen(game, levelIndex));
       return;
     }
@@ -113,8 +112,7 @@ class PlayScreen extends ScreenAdapter {
       return;
     }
 
-    _submitDirection(appData, _readCurrentDirection());
-    _handleJumpInput(appData);
+    appData.updateMovementDirection(_readCurrentDirection());
     _applyServerLayerTransforms(appData.layerTransforms);
     _applyServerZoneTransforms(appData.zoneTransforms);
     _updateCameraForGameplay(appData);
@@ -166,7 +164,7 @@ class PlayScreen extends ScreenAdapter {
 
   @override
   void dispose() {
-    _submitDirection(game.getAppData(), 'none');
+    game.getAppData().updateMovementDirection('none');
     debugOverlay.dispose();
   }
 
@@ -432,26 +430,6 @@ class PlayScreen extends ScreenAdapter {
     batch.end();
   }
 
-  /// Envía la dirección de movimiento al servidor si ha cambiado
-  /// Evita enviar mensajes redundantes cuando la dirección no cambia
-  void _submitDirection(AppData appData, String direction) {
-    if (_lastSubmittedDirection == direction) {
-      return;
-    }
-    _lastSubmittedDirection = direction;
-    appData.updateMovementDirection(direction);
-  }
-
-  /// Maneja el input del salto del jugador local
-  /// Se activa al presionar SPACE, UP o W
-  void _handleJumpInput(AppData appData) {
-    if (Gdx.input.isKeyJustPressed(Input.keys.space) ||
-        Gdx.input.isKeyJustPressed(Input.keys.up) ||
-        Gdx.input.isKeyJustPressed(Input.keys.w)) {
-      appData.requestJump();
-    }
-  }
-
   /// Lee la entrada del usuario y retorna la dirección de movimiento
   /// Soporta las flechas del teclado (LEFT/RIGHT) y WASD (A/D)
   /// Retorna 'left', 'right' o 'none'
@@ -712,25 +690,18 @@ class PlayScreen extends ScreenAdapter {
     final String facing = player.facing;
     final String animationName = _playerSkinAnimationNameFor(player);
     final bool inAir = !player.onGround;
-    bool flipX = false;
+    final bool flipX = facing == 'left';
 
     if (inAir) {
       final _AnimatedSpriteFrame frame = _frameFromTemplate(
         playerTemplate,
         animationName: animationName,
+        flipX: flipX,
       );
       if (!game.getAssetManager().isLoaded(frame.texturePath, Texture)) {
-        return _frameFromTemplate(playerTemplate);
+        return _frameFromTemplate(playerTemplate, flipX: flipX);
       }
       return frame;
-    }
-
-    switch (facing) {
-      case 'left':
-        flipX = true;
-        break;
-      default:
-        break;
     }
 
     final _AnimatedSpriteFrame frame = _frameFromTemplate(
