@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/c/Users/Victo/Documents/GitHub/**)",
+      "Bash(node --check server/gameLogic.js)",
+      "Bash(node --check server/utilsWebSockets.js)",
+      "Bash(node --check server/inactivityMonitor.js)",
+      "Bash(node --check server/app.js)",
+      "Bash(flutter clean *)",
+      "Bash(flutter build *)",
+      "Bash(node -e ' *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \"ESTABLISHED\")",
+      "Bash(tasklist /FI \"PID eq 2164\" /FO LIST)",
+      "Bash(tasklist /FI \"PID eq 19412\" /FO LIST)",
+      "PowerShell(Get-Process -Id 2164, 19412)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000)",
+      "PowerShell(Get-Process | Where-Object { $_.Id -eq 19412 -or $_.Id -eq 2164 } | Select-Object Id, ProcessName, Path)",
+      "PowerShell(Get-NetTCPConnection -RemotePort 3000)",
+      "PowerShell(Get-Process -Id 2164 -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, Path, CommandLine; \\(Get-WmiObject Win32_Process -Filter \"ProcessId=2164\"\\).CommandLine)"
+    ]
+  }
+}

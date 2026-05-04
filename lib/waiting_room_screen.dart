@@ -59,6 +59,13 @@ class WaitingRoomScreen extends ScreenAdapter {
   @override
   void show() {
     game.queueReferencedAssetsForLevel(levelIndex);
+    // Keep trying to connect while the player is on this screen.
+    game.getAppData().startConnectionRetryTimer();
+  }
+
+  @override
+  void dispose() {
+    game.getAppData().stopRetryTimer();
   }
 
   @override

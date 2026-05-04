@@ -162,6 +162,20 @@ class GameApp extends Game {
 
       await _loadAnimationsFile(root);
 
+      // Collect project-wide media assets (e.g. background.png declared at root level)
+      final Array<String> projectMediaFiles = Array<String>();
+      final List<dynamic>? mediaAssets = root['mediaAssets'] as List<dynamic>?;
+      if (mediaAssets != null) {
+        for (final dynamic rawAsset in mediaAssets) {
+          if (rawAsset is Map) {
+            final String? fileName = rawAsset['fileName'] as String?;
+            if (fileName != null && _looksLikeImageFile(fileName)) {
+              projectMediaFiles.add(fileName);
+            }
+          }
+        }
+      }
+
       int index = 0;
       for (final dynamic rawLevel in levels) {
         final Map<String, dynamic>? level = rawLevel as Map<String, dynamic>?;
@@ -172,6 +186,12 @@ class GameApp extends Game {
         final String levelName = (level['name'] as String?) ?? 'Level $index';
         levelNames.add(levelName);
         final Array<String> levelImageFiles = Array<String>();
+        // Merge project-wide media into every level so background etc. are always loaded
+        for (final String f in projectMediaFiles.iterable()) {
+          if (!levelImageFiles.contains(f, false)) {
+            levelImageFiles.add(f);
+          }
+        }
         _collectImageFiles(level, levelImageFiles);
         _collectAnimationMediaForLevel(level, levelImageFiles);
         referencedImageFilesByLevel.add(levelImageFiles);
@@ -365,7 +385,8 @@ class GameApp extends Game {
   }
 
   bool _looksLikeImageField(String fieldName) {
-    return fieldName.endsWith('File');
+    final String lower = fieldName.toLowerCase();
+    return lower.endsWith('file') || lower == 'filename';
   }
 
   bool _looksLikeImageFile(String path) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -223,9 +224,14 @@ class AppData extends ChangeNotifier {
 
   int _reconnectAttempts = 0;
   bool _intentionalDisconnect = false;
+  bool _wasKicked = false;
   bool _disposed = false;
   bool _registrationSent = false;
   String _lastDirection = 'none';
+  Timer? _connectionRetryTimer;
+
+  // Whether the player was kicked by the server (suppresses reconnect UI).
+  bool get wasKicked => _wasKicked;
   final List<_LocalBotProfile> _localBotPool = const <_LocalBotProfile>[
     _LocalBotProfile(id: 'bot_local_1', name: 'Bot Kiwi'),
     _LocalBotProfile(id: 'bot_local_2', name: 'Bot Mango'),
@@ -363,6 +369,7 @@ class AppData extends ChangeNotifier {
 
   void disconnect() {
     _intentionalDisconnect = true;
+    stopRetryTimer();
     _lastDirection = 'none';
     _registrationSent = false;
     _wsHandler.disconnectFromServer();
@@ -385,12 +392,37 @@ class AppData extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    stopRetryTimer();
     disconnect();
     super.dispose();
   }
 
+  // Starts a periodic timer that keeps trying to connect while the player is
+  // on the waiting room screen and not yet connected.
+  void startConnectionRetryTimer() {
+    if (_connectionRetryTimer != null) return;
+    _connectionRetryTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (_disposed || _wasKicked) {
+        stopRetryTimer();
+        return;
+      }
+      if (!isConnected && !isConnecting) {
+        _reconnectAttempts = 0;
+        _connectToWebSocket();
+      }
+    });
+  }
+
+  void stopRetryTimer() {
+    _connectionRetryTimer?.cancel();
+    _connectionRetryTimer = null;
+  }
+
   void _connectToWebSocket() {
-    if (_disposed) {
+    if (_disposed || _wasKicked) {
+      return;
+    }
+    if (isConnected || isConnecting) {
       return;
     }
     if (_reconnectAttempts >= _maxReconnectAttempts) {
@@ -401,6 +433,7 @@ class AppData extends ChangeNotifier {
     }
 
     _intentionalDisconnect = false;
+    _wasKicked = false;
     _registrationSent = false;
     isConnecting = true;
     isConnected = false;
@@ -530,7 +563,14 @@ class AppData extends ChangeNotifier {
             (payload['socketId'] as String? ?? _wsHandler.socketId ?? '')
                 .trim();
         if (candidateId.isNotEmpty) {
+          // Always overwrite: a new welcome means a new server session/ID.
+          // Using ??= here would leave a stale ID from a previous connection
+          // and cause a ghost player in _playerDynamicById.
           playerId = candidateId;
+          // Clear dynamic state so stale IDs from the old session don't leak
+          // into _rebuildPlayers via the static ∪ dynamic union.
+          _playerStaticById = const <String, _PlayerStaticData>{};
+          _playerDynamicById = const <String, _PlayerDynamicData>{};
         }
         minPlayers = math.max(
           _minimumPlayersRequired,
@@ -566,6 +606,14 @@ class AppData extends ChangeNotifier {
         roomStatus = 'in_game';
         phase = MatchPhase.playing;
         notifyListeners();
+        return;
+      }
+
+      if (type == 'kicked') {
+        // Server kicked us — mark as kicked so neither auto-reconnect nor the
+        // retry timer attempt to reconnect. The socket will close right after.
+        _wasKicked = true;
+        _intentionalDisconnect = true;
         return;
       }
 
@@ -751,15 +799,18 @@ class AppData extends ChangeNotifier {
         ? MultiplayerKey.fromJson(_mapFromDynamic(rawKey))
         : null;
 
+    // Start from an empty map when we have a known static set, so that stale
+    // IDs from previous connections never sneak in via the union in _rebuildPlayers.
     final Map<String, _PlayerDynamicData> nextDynamicById =
-        Map<String, _PlayerDynamicData>.from(_playerDynamicById);
+        _playerStaticById.isNotEmpty
+            ? <String, _PlayerDynamicData>{}
+            : Map<String, _PlayerDynamicData>.from(_playerDynamicById);
 
     final Object? rawSelfPlayer = state['selfPlayer'];
     if (rawSelfPlayer is Map) {
       final Map<String, dynamic> selfPlayer = _mapFromDynamic(rawSelfPlayer);
       final String selfId = (selfPlayer['id'] as String? ?? '').trim();
       if (selfId.isNotEmpty) {
-        playerId ??= selfId;
         nextDynamicById[selfId] = _dynamicPlayerFromJson(selfPlayer);
       }
     }
@@ -995,24 +1046,49 @@ class AppData extends ChangeNotifier {
     if (kDebugMode) {
       print('Error de WebSocket: $error');
     }
-    isConnected = false;
-    isConnecting = false;
-    notifyListeners();
+    _resetConnectionState();
     _scheduleReconnect();
   }
 
   void _onWebSocketClosed() {
-    if (kDebugMode) {
-      print('WebSocket tancat. Intentant reconnectar...');
+    // If the server closed with the kick code, treat it as permanent.
+    final int? closeCode = _wsHandler.lastCloseCode;
+    if (closeCode == kKickCloseCode) {
+      if (kDebugMode) {
+        print('WebSocket tancat per kick del servidor (codi $closeCode). No es reconnecta.');
+      }
+      _wasKicked = true;
+      _intentionalDisconnect = true;
+      _resetConnectionState();
+      return;
     }
-    isConnected = false;
-    isConnecting = false;
-    notifyListeners();
+    if (kDebugMode) {
+      print('WebSocket tancat (codi $closeCode). Intentant reconnectar...');
+    }
+    _resetConnectionState();
     _scheduleReconnect();
   }
 
+  // Cleans up all in-session state when the connection drops (intentional or not).
+  // Called on both error and clean close so the UI never shows stale data.
+  void _resetConnectionState() {
+    isConnected = false;
+    isConnecting = false;
+    phase = MatchPhase.connecting;
+    roomStatus = 'connecting';
+    roomErrorMessage = null;
+    players = const <MultiplayerPlayer>[];
+    gems = const <MultiplayerGem>[];
+    matchKey = null;
+    _playerStaticById = const <String, _PlayerStaticData>{};
+    _playerDynamicById = const <String, _PlayerDynamicData>{};
+    _registrationSent = false;
+    _lastDirection = 'none';
+    notifyListeners();
+  }
+
   void _scheduleReconnect() {
-    if (_intentionalDisconnect || _disposed) {
+    if (_intentionalDisconnect || _wasKicked || _disposed) {
       return;
     }
     if (_reconnectAttempts >= _maxReconnectAttempts) {
