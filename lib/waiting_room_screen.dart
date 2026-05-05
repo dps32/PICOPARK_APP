@@ -39,7 +39,7 @@ class WaitingRoomScreen extends ScreenAdapter {
   static final ui.Color listStroke = colorValueOf('9FA4AD');
   static final ui.Color playButtonFill = colorValueOf('0038B8');
   static final ui.Color playButtonDisabledFill = colorValueOf('B7BDC7');
-  static final ui.Color playButtonStroke = colorValueOf('0038B8');
+  static final ui.Color playButtonStroke = colorValueOf('002A8A');
   static final ui.Color playButtonDisabledStroke = colorValueOf('9FA4AD');
   static final ui.Color errorColor = colorValueOf('6F7682');
 
@@ -124,25 +124,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     shapes.end();
 
     final bool canStart = appData.canRequestMatchStart;
-    shapes.begin(ShapeType.filled);
-    shapes.setColor(canStart ? playButtonFill : playButtonDisabledFill);
-    shapes.rect(
-      playButtonBounds.x,
-      playButtonBounds.y,
-      playButtonBounds.width,
-      playButtonBounds.height,
-    );
-    shapes.end();
-
-    shapes.begin(ShapeType.line);
-    shapes.setColor(canStart ? playButtonStroke : playButtonDisabledStroke);
-    shapes.rect(
-      playButtonBounds.x,
-      playButtonBounds.y,
-      playButtonBounds.width,
-      playButtonBounds.height,
-    );
-    shapes.end();
+    _renderPlayButton(shapes, canStart);
 
     final SpriteBatch batch = game.getBatch();
     final BitmapFont font = game.getFont();
@@ -151,7 +133,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     _drawCenteredText(
       batch,
       font,
-      'Waiting Room',
+      'Sala de espera',
       screenWidth,
       cardY + 72,
       _baseTitleScale * scale,
@@ -160,7 +142,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     _drawCenteredText(
       batch,
       font,
-      'Room ${appData.roomLabel}',
+      'Sala ${appData.roomLabel}',
       screenWidth,
       cardY + 110,
       _baseRoomScale * scale,
@@ -168,7 +150,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     );
 
     final String playersCounter =
-        '${appData.sortedPlayers.length}/${appData.maxPlayers} players';
+        '${appData.sortedPlayers.length}/${appData.maxPlayers} jugadores';
     _drawCenteredText(
       batch,
       font,
@@ -182,7 +164,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     _drawCenteredText(
       batch,
       font,
-      'Players in room',
+      'Jugadores en la sala',
       screenWidth,
       listY - 18,
       _baseSectionScale * scale,
@@ -194,7 +176,7 @@ class WaitingRoomScreen extends ScreenAdapter {
       _drawCenteredText(
         batch,
         font,
-        'No players connected yet',
+        'Aun no hay jugadores conectados',
         screenWidth,
         listY + 108,
         _baseEmptyScale * scale,
@@ -225,7 +207,7 @@ class WaitingRoomScreen extends ScreenAdapter {
     _drawCenteredText(
       batch,
       font,
-      canStart ? 'Play (Enter)' : 'Play',
+      canStart ? 'Jugar (Enter)' : 'Jugar',
       screenWidth,
       playButtonBounds.y + playButtonBounds.height * 0.67,
       _baseButtonScale * scale,
@@ -236,7 +218,7 @@ class WaitingRoomScreen extends ScreenAdapter {
       _drawCenteredText(
         batch,
         font,
-        'Need at least ${appData.minPlayers} players',
+        'Se necesitan al menos ${appData.minPlayers} jugadores',
         screenWidth,
         playButtonBounds.y - 18,
         _baseNoteScale * scale,
@@ -258,6 +240,25 @@ class WaitingRoomScreen extends ScreenAdapter {
     }
 
     batch.end();
+  }
+
+  // pintamos el boton de jugar con sombra, pseudo gradiente y highlight para
+  // que se vea mas pulido sin necesidad de assets
+  void _renderPlayButton(ShapeRenderer shapes, bool canStart) {
+    final double bx = playButtonBounds.x;
+    final double by = playButtonBounds.y;
+    final double bw = playButtonBounds.width;
+    final double bh = playButtonBounds.height;
+
+    shapes.begin(ShapeType.filled);
+    shapes.setColor(canStart ? playButtonFill : playButtonDisabledFill);
+    shapes.rect(bx, by, bw, bh);
+    shapes.end();
+
+    shapes.begin(ShapeType.line);
+    shapes.setColor(canStart ? playButtonStroke : playButtonDisabledStroke);
+    shapes.rect(bx, by, bw, bh);
+    shapes.end();
   }
 
   void _drawCenteredText(

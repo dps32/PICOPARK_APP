@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -179,10 +180,44 @@ class AssetManager {
   }
 
   Future<Texture> _loadTexture(String path) async {
-    final ByteData data = await rootBundle.load('assets/$path');
-    final Uint8List bytes = data.buffer.asUint8List();
+    final Uint8List bytes = await _readAssetBytes(path);
+    if (bytes.isEmpty) {
+      throw StateError('Asset $path is empty.');
+    }
     final ui.Codec codec = await ui.instantiateImageCodec(bytes);
     final ui.FrameInfo frameInfo = await codec.getNextFrame();
     return Texture(frameInfo.image);
+  }
+
+  // intentamos primero el rootBundle; si falla o devuelve vacio, leemos del disco
+  // como fallback. Soluciona el problema de que dos instancias del .exe en debug
+  // colisionen en el cache compartido del bundle y una vea bytes vacios.
+  Future<Uint8List> _readAssetBytes(String path) async {
+    try {
+      final ByteData data = await rootBundle.load('assets/$path');
+      final Uint8List bytes = data.buffer.asUint8List();
+      if (bytes.isNotEmpty) {
+        return bytes;
+      }
+    } catch (_) {
+      // si el bundle peta seguimos con el fallback de disco
+    }
+    return _readAssetFromDisk(path);
+  }
+
+  Future<Uint8List> _readAssetFromDisk(String path) async {
+    final String exeDir = File(Platform.resolvedExecutable).parent.path;
+    final List<String> candidates = <String>[
+      '$exeDir/data/flutter_assets/assets/$path',
+      '$exeDir/Frameworks/App.framework/Resources/flutter_assets/assets/$path',
+      '$exeDir/flutter_assets/assets/$path',
+    ];
+    for (final String candidate in candidates) {
+      final File file = File(candidate);
+      if (await file.exists()) {
+        return file.readAsBytes();
+      }
+    }
+    throw StateError('Asset $path not found on disk near $exeDir.');
   }
 }

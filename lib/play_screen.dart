@@ -59,10 +59,15 @@ class PlayScreen extends ScreenAdapter {
   late final Array<RuntimeTransform> zoneRuntimeStates;
   late final LevelSprite playerTemplate;
   late final LevelSprite? keyTemplate;
+  late final int? doorSpriteIndex;
   late final Map<String, LevelSprite> gemTemplateByType;
 
   double elapsedSeconds = 0;
   bool _showDebugOverlay = false;
+  double _winFadeOutSeconds = 0.0;
+  double _winFadeInSeconds = 0.0;
+  static const double _winFadeOutDuration = 2.0;
+  static const double _winFadeInDuration = 2.0;
 
   PlayScreen(this.game, this.levelIndex) {
     levelData = LevelLoader.loadLevel(levelIndex);
@@ -73,6 +78,7 @@ class PlayScreen extends ScreenAdapter {
     zoneRuntimeStates = _createZoneRuntimeStates(levelData);
     playerTemplate = _findPlayerTemplate(levelData);
     keyTemplate = _findKeyTemplate(levelData);
+    doorSpriteIndex = _findDoorSpriteIndex(levelData);
     gemTemplateByType = _buildGemTemplates(levelData);
     _applyInitialCameraFromLevel();
     viewport.update(
@@ -92,6 +98,19 @@ class PlayScreen extends ScreenAdapter {
     elapsedSeconds += math.max(0, math.min(delta, maxFrameSeconds));
 
     final AppData appData = game.getAppData();
+    
+    // arrancamos el fade en cuanto el player local empieza a caminar tras la
+    // puerta (winStage = walking), o si la partida ya esta finished
+    final MultiplayerPlayer? localPlayer = appData.localPlayer;
+    final bool localInWinSequence = localPlayer != null &&
+        (localPlayer.winStage == 'walking' || localPlayer.winStage == 'won');
+    if (localInWinSequence || appData.phase == MatchPhase.finished) {
+      if (_winFadeOutSeconds < _winFadeOutDuration) {
+        _winFadeOutSeconds += delta;
+      } else if (_winFadeInSeconds < _winFadeInDuration) {
+        _winFadeInSeconds += delta;
+      }
+    }
     // Solo vuelve a WaitingRoom si NO está en LOCAL mode (LOCAL mode siempre juega)
     if ((appData.phase == MatchPhase.waiting ||
             appData.phase == MatchPhase.connecting) &&
@@ -115,6 +134,7 @@ class PlayScreen extends ScreenAdapter {
     appData.updateMovementDirection(_readCurrentDirection());
     _applyServerLayerTransforms(appData.layerTransforms);
     _applyServerZoneTransforms(appData.zoneTransforms);
+    _applyDoorAnimation(appData);
     _updateCameraForGameplay(appData);
 
     viewport.apply();
@@ -149,23 +169,30 @@ class PlayScreen extends ScreenAdapter {
     }
     // _renderLocalPlayerHighlight(); // Círculo del personaje local removido
 
-    _renderObjective();
     // _renderLeaderboard(appData); // Leaderboard removida
-    if (appData.phase == MatchPhase.finished) {
+    if (localInWinSequence || appData.phase == MatchPhase.finished) {
       _renderWinnerOverlay(appData);
+      _renderWinFade(localInWinSequence);
     }
   }
 
-  @override
-  void resize(int width, int height) {
-    viewport.update(width.toDouble(), height.toDouble(), false);
-    _updateCameraForGameplay(game.getAppData());
-  }
-
-  @override
-  void dispose() {
-    game.getAppData().updateMovementDirection('none');
-    debugOverlay.dispose();
+  void _renderGems(SpriteBatch batch, List<MultiplayerGem> gems) {
+    for (final MultiplayerGem gem in gems) {
+      final LevelSprite? template =
+          gemTemplateByType[gem.type] ?? gemTemplateByType['green'];
+      if (template == null) {
+        continue;
+      }
+      final _AnimatedSpriteFrame frame = _frameFromTemplate(template);
+      _drawAnimatedSprite(
+        batch,
+        frame: frame,
+        worldX: gem.x,
+        worldY: gem.y,
+        width: gem.width,
+        height: gem.height,
+      );
+    }
   }
 
   void _renderPlayers(
@@ -213,25 +240,6 @@ class PlayScreen extends ScreenAdapter {
     }
   }
 
-  void _renderGems(SpriteBatch batch, List<MultiplayerGem> gems) {
-    for (final MultiplayerGem gem in gems) {
-      final LevelSprite? template =
-          gemTemplateByType[gem.type] ?? gemTemplateByType['green'];
-      if (template == null) {
-        continue;
-      }
-      final _AnimatedSpriteFrame frame = _frameFromTemplate(template);
-      _drawAnimatedSprite(
-        batch,
-        frame: frame,
-        worldX: gem.x,
-        worldY: gem.y,
-        width: gem.width,
-        height: gem.height,
-      );
-    }
-  }
-
   void _renderMatchKey(SpriteBatch batch, MultiplayerKey? matchKey) {
     final LevelSprite? template = keyTemplate;
     if (template == null || matchKey == null) {
@@ -239,11 +247,15 @@ class PlayScreen extends ScreenAdapter {
     }
 
     final _AnimatedSpriteFrame frame = _frameFromTemplate(template);
+    // mientras nadie la ha cogido la llave flota suavemente arriba y abajo
+    final double bobOffset = matchKey.picked
+        ? 0.0
+        : math.sin(elapsedSeconds * 2.6) * 3.0;
     _drawAnimatedSprite(
       batch,
       frame: frame,
       worldX: matchKey.x,
-      worldY: matchKey.y,
+      worldY: matchKey.y + bobOffset,
       width: matchKey.width,
       height: matchKey.height,
     );
@@ -372,50 +384,40 @@ class PlayScreen extends ScreenAdapter {
   //   batch.end();
   // }
 
-  /// Renderiza el objetivo del juego en la pantalla
-  void _renderObjective() {
-    // Objetivo visual desactivado: no dibujar texto en medio de la partida.
-    return;
+  void _renderWinnerOverlay(AppData appData) {
+    // Kept for compatibility with the existing render flow.
+    // The actual win transition is handled by _renderWinFade().
   }
 
-  void _renderWinnerOverlay(AppData appData) {
+  void _renderWinFade(bool localIsWinner) {
     final ShapeRenderer shapes = game.getShapeRenderer();
     final double screenWidth = Gdx.graphics.getWidth().toDouble();
     final double screenHeight = Gdx.graphics.getHeight().toDouble();
+    final double fadeOutProgress = math.min(1.0, _winFadeOutSeconds / _winFadeOutDuration);
+    final double fadeInProgress = math.min(1.0, _winFadeInSeconds / _winFadeInDuration);
+
     shapes.begin(ShapeType.filled);
-    shapes.setColor(winnerOverlayColor);
+    shapes.setColor(ui.Color.fromARGB((fadeOutProgress * 255).round(), 0, 0, 0));
     shapes.rect(0, 0, screenWidth, screenHeight);
     shapes.end();
 
-    final MultiplayerPlayer? winner = appData.sortedPlayers.isEmpty
-        ? null
-        : appData.sortedPlayers.first;
-    final String title = winner == null
-        ? 'Match Finished'
-        : '${winner.name} wins with ${winner.score}';
-
-    final SpriteBatch batch = game.getBatch();
-    final BitmapFont font = game.getFont();
-    batch.begin();
-    _drawCenteredText(
-      batch,
-      font,
-      title,
-      screenHeight * 0.46,
-      2.2,
-      titleColor,
-      maxWidth: screenWidth - leaderboardWidth,
-    );
-    _drawCenteredText(
-      batch,
-      font,
-      'All gems were collected.',
-      screenHeight * 0.53,
-      1.15,
-      textColor,
-      maxWidth: screenWidth - leaderboardWidth,
-    );
-    batch.end();
+    if (_winFadeOutSeconds >= _winFadeOutDuration) {
+      final SpriteBatch batch = game.getBatch();
+      final BitmapFont font = game.getFont();
+      final ui.Color textColor = ui.Color.fromARGB((fadeInProgress * 255).round(), 255, 255, 255);
+      final String message = localIsWinner ? 'Has ganado' : 'Fin de la partida';
+      batch.begin();
+      _drawCenteredText(
+        batch,
+        font,
+        message,
+        screenHeight * 0.5,
+        2.5,
+        textColor,
+        maxWidth: screenWidth,
+      );
+      batch.end();
+    }
   }
 
   /// Lee la entrada del usuario y retorna la dirección de movimiento
@@ -635,6 +637,26 @@ class PlayScreen extends ScreenAdapter {
     }
   }
 
+  void _applyDoorAnimation(AppData appData) {
+    final MultiplayerDoor? door = appData.matchDoor;
+    if (door == null || !door.enabled) {
+      return;
+    }
+
+    final int index = door.spriteIndex >= 0 && door.spriteIndex < spriteRuntimeStates.size
+        ? door.spriteIndex
+        : (doorSpriteIndex ?? -1);
+    if (index < 0 || index >= spriteRuntimeStates.size) {
+      return;
+    }
+
+    final SpriteRuntimeState runtime = spriteRuntimeStates.get(index);
+    runtime.visible = true;
+    runtime.worldX = door.x;
+    runtime.worldY = door.y;
+    runtime.frameIndex = door.frameIndex;
+  }
+
   LevelSprite _findPlayerTemplate(LevelData data) {
     for (final LevelSprite sprite in data.sprites.iterable()) {
       if (normalize(sprite.type).contains('hero')) {
@@ -652,6 +674,17 @@ class PlayScreen extends ScreenAdapter {
           token.startsWith('key') ||
           token.contains('llave')) {
         return sprite;
+      }
+    }
+    return null;
+  }
+
+  int? _findDoorSpriteIndex(LevelData data) {
+    for (int i = 0; i < data.sprites.size; i++) {
+      final LevelSprite sprite = data.sprites.get(i);
+      final String token = normalize('${sprite.type} ${sprite.name}');
+      if (token.contains('netandoor') || token.contains('door')) {
+        return i;
       }
     }
     return null;

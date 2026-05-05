@@ -485,22 +485,14 @@ class _GameViewState extends State<_GameView>
             _offsetX = 0;
             _offsetY = 0;
           }
-          final double reservedRightWidth =
-              constraints.maxWidth > (PlayScreen.leaderboardWidth + 180)
-              ? PlayScreen.leaderboardWidth
-              : 0;
-          final double overlayAreaWidth = math.max(
-            0,
-            constraints.maxWidth - reservedRightWidth,
-          );
           final double restartButtonWidth = math.min(
             280,
-            math.max(180, overlayAreaWidth - 48),
+            math.max(180, constraints.maxWidth - 48),
           );
-          final double restartButtonLeft = math.max(
-            24,
-            (overlayAreaWidth - restartButtonWidth) * 0.5,
-          );
+          // centramos respecto al ancho total de la pantalla, no respecto al
+          // area sin la leaderboard (que ya no se renderiza)
+          final double restartButtonLeft =
+              (constraints.maxWidth - restartButtonWidth) * 0.5;
           final double restartButtonTop = math.min(
             constraints.maxHeight - 84,
             constraints.maxHeight * 0.64,
@@ -590,7 +582,7 @@ class _GameViewState extends State<_GameView>
                       onPressed: appData.canRequestMatchRestart
                           ? appData.requestMatchRestart
                           : null,
-                      child: const Text('Restart Match'),
+                      child: const Text('Reiniciar partida'),
                     ),
                   ),
                 if (showWaitingRoomPlayHitTarget)

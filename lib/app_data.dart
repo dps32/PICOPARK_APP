@@ -24,6 +24,7 @@ class MultiplayerPlayer {
   final double velocityY;
   final bool onGround;
   final int joinOrder;
+  final String winStage;
 
   const MultiplayerPlayer({
     required this.id,
@@ -40,6 +41,7 @@ class MultiplayerPlayer {
     required this.velocityY,
     required this.onGround,
     required this.joinOrder,
+    this.winStage = 'none',
   });
 
   factory MultiplayerPlayer.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class MultiplayerPlayer {
       velocityY: (json['velocityY'] as num? ?? 0).toDouble(),
       onGround: json['onGround'] as bool? ?? true,
       joinOrder: (json['joinOrder'] as num? ?? 0).toInt(),
+      winStage: (json['winStage'] as String? ?? 'none').trim(),
     );
   }
 }
@@ -123,6 +126,50 @@ class MultiplayerKey {
   }
 }
 
+class MultiplayerDoor {
+  final bool enabled;
+  final bool opened;
+  final String carrierId;
+  final int spriteIndex;
+  final String animationId;
+  final int openedAtTick;
+  final int frameIndex;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+
+  const MultiplayerDoor({
+    required this.enabled,
+    required this.opened,
+    required this.carrierId,
+    required this.spriteIndex,
+    required this.animationId,
+    required this.openedAtTick,
+    required this.frameIndex,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+  });
+
+  factory MultiplayerDoor.fromJson(Map<String, dynamic> json) {
+    return MultiplayerDoor(
+      enabled: json['enabled'] as bool? ?? false,
+      opened: json['opened'] as bool? ?? false,
+      carrierId: (json['carrierId'] as String? ?? '').trim(),
+      spriteIndex: (json['spriteIndex'] as num? ?? -1).toInt(),
+      animationId: (json['animationId'] as String? ?? '').trim(),
+      openedAtTick: (json['openedAtTick'] as num? ?? 0).toInt(),
+      frameIndex: (json['frameIndex'] as num? ?? 0).toInt(),
+      x: (json['x'] as num? ?? 0).toDouble(),
+      y: (json['y'] as num? ?? 0).toDouble(),
+      width: (json['width'] as num? ?? 27).toDouble(),
+      height: (json['height'] as num? ?? 39).toDouble(),
+    );
+  }
+}
+
 class TransformSnapshot {
   final int index;
   final double x;
@@ -170,6 +217,7 @@ class _PlayerDynamicData {
   final bool moving;
   final double velocityY;
   final bool onGround;
+  final String winStage;
 
   const _PlayerDynamicData({
     required this.id,
@@ -182,6 +230,7 @@ class _PlayerDynamicData {
     required this.moving,
     required this.velocityY,
     required this.onGround,
+    this.winStage = 'none',
   });
 }
 
@@ -219,6 +268,7 @@ class AppData extends ChangeNotifier {
   List<MultiplayerPlayer> players = const <MultiplayerPlayer>[];
   List<MultiplayerGem> gems = const <MultiplayerGem>[];
   MultiplayerKey? matchKey;
+  MultiplayerDoor? matchDoor;
   List<TransformSnapshot> layerTransforms = const <TransformSnapshot>[];
   List<TransformSnapshot> zoneTransforms = const <TransformSnapshot>[];
 
@@ -384,6 +434,7 @@ class AppData extends ChangeNotifier {
     players = const <MultiplayerPlayer>[];
     gems = const <MultiplayerGem>[];
     matchKey = null;
+    matchDoor = null;
     _playerStaticById = const <String, _PlayerStaticData>{};
     _playerDynamicById = const <String, _PlayerDynamicData>{};
     notifyListeners();
@@ -753,6 +804,7 @@ class AppData extends ChangeNotifier {
         moving: player['moving'] as bool? ?? false,
         velocityY: (player['velocityY'] as num? ?? 0).toDouble(),
         onGround: player['onGround'] as bool? ?? true,
+        winStage: (player['winStage'] as String? ?? 'none').trim(),
       );
       joinOrder++;
     }
@@ -798,6 +850,10 @@ class AppData extends ChangeNotifier {
     matchKey = rawKey is Map
         ? MultiplayerKey.fromJson(_mapFromDynamic(rawKey))
         : null;
+    final Object? rawDoor = state['door'];
+    matchDoor = rawDoor is Map
+      ? MultiplayerDoor.fromJson(_mapFromDynamic(rawDoor))
+      : null;
 
     // Start from an empty map when we have a known static set, so that stale
     // IDs from previous connections never sneak in via the union in _rebuildPlayers.
@@ -898,6 +954,7 @@ class AppData extends ChangeNotifier {
       moving: json['moving'] as bool? ?? false,
       velocityY: (json['velocityY'] as num? ?? 0).toDouble(),
       onGround: json['onGround'] as bool? ?? true,
+      winStage: (json['winStage'] as String? ?? 'none').trim(),
     );
   }
 
@@ -925,6 +982,7 @@ class AppData extends ChangeNotifier {
             velocityY: dynamicData?.velocityY ?? 0,
             onGround: dynamicData?.onGround ?? true,
             joinOrder: staticData?.joinOrder ?? 0,
+            winStage: dynamicData?.winStage ?? 'none',
           );
         })
         .toList(growable: false);
