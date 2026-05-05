@@ -374,20 +374,8 @@ class PlayScreen extends ScreenAdapter {
 
   /// Renderiza el objetivo del juego en la pantalla
   void _renderObjective() {
-    final double screenWidth = Gdx.graphics.getWidth().toDouble();
-    final SpriteBatch batch = game.getBatch();
-    final BitmapFont font = game.getFont();
-    batch.begin();
-    _drawLeftAlignedText(
-      batch,
-      font,
-      'Objectivo: Abrir la puerta',
-      20,
-      screenWidth - 20,
-      1.2,
-      titleColor,
-    );
-    batch.end();
+    // Objetivo visual desactivado: no dibujar texto en medio de la partida.
+    return;
   }
 
   void _renderWinnerOverlay(AppData appData) {
